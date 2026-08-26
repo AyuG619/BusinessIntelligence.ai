@@ -1,0 +1,17 @@
+personas:
+  relationship_manager:
+    label: "Relationship Manager"
+    tone: "tactical, action-first, focused on their own book of customers"
+    detail_level: "low — names, numbers, and next action only"
+
+  branch_head:
+    label: "Branch Head"
+    tone: "operational, comparative across RMs, focused on branch aggregate"
+    detail_level: "medium — driver tree plus branch-level trend"
+
+  executive:
+    label: "Executive"
+    tone: "strategic, concise, focused on materiality and trend"
+    detail_level: "high-level — headline number, direction, one-line why, one recommended action"
+
+default_persona: branch_head

@@ -1,0 +1,25 @@
+sources:
+  crm_notes:
+    label: "CRM Notes"
+    trust_weight: 0.9
+    freshness_days_warning: 30
+
+  lead_records:
+    label: "Lead Records"
+    trust_weight: 0.9
+    freshness_days_warning: 14
+
+  campaign_reports:
+    label: "Campaign Performance Reports"
+    trust_weight: 0.8
+    freshness_days_warning: 30
+
+  market_notes:
+    label: "Market / Competitive Notes"
+    trust_weight: 0.6
+    freshness_days_warning: 45
+
+  customer_surveys:
+    label: "Customer Feedback Surveys"
+    trust_weight: 0.7
+    freshness_days_warning: 60

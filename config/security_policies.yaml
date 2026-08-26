@@ -1,0 +1,47 @@
+roles:
+  relationship_manager:
+    label: "Relationship Manager"
+    scope: own_customers
+    can_view:
+      - own_customers
+      - own_portfolio
+      - own_branch_aggregate
+    denied:
+      - other_rm_customers
+      - other_branches
+      - sensitive_income_data
+
+  branch_head:
+    label: "Branch Head"
+    scope: own_branch
+    can_view:
+      - all_rm_customers_in_branch
+      - branch_aggregate
+      - branch_comparison
+    denied:
+      - other_branches_customer_level
+      - sensitive_income_data
+
+  admin:
+    label: "Admin"
+    scope: global
+    can_view:
+      - all_customers
+      - all_branches
+      - sensitive_income_data
+    denied: []
+
+# Demo users used by ui/pages/4_Security_Demo.py and login selector
+demo_users:
+  - user_id: RM-103
+    role: relationship_manager
+    branch_id: BR-01
+  - user_id: RM-108
+    role: relationship_manager
+    branch_id: BR-01
+  - user_id: BH-01
+    role: branch_head
+    branch_id: BR-01
+  - user_id: ADMIN-01
+    role: admin
+    branch_id: null

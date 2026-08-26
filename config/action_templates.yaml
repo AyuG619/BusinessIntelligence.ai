@@ -1,0 +1,39 @@
+# driver_key -> recommended action template
+# {n} placeholders are filled by recommend/engine.py from live query results
+
+actions:
+  unresolved_leads:
+    lever: "RM follow-up"
+    action: "Prioritize {n} high-value unresolved {product} leads"
+    owner: "Relationship Manager"
+    monitoring_kpi: "lead_conversion_rate"
+
+  credit_card_dropoff:
+    lever: "Cross-sell campaign"
+    action: "Re-engage {n} salary-account customers without a credit card via targeted offer"
+    owner: "Branch Head"
+    monitoring_kpi: "cross_sell_revenue"
+
+  pricing_pressure:
+    lever: "Pricing review"
+    action: "Review competitive pricing for the affected product segment"
+    owner: "Product Team"
+    monitoring_kpi: "customer_retention_rate"
+
+  engagement_decline:
+    lever: "Relationship touchpoint"
+    action: "Schedule proactive outreach for {n} customers with declining engagement"
+    owner: "Relationship Manager"
+    monitoring_kpi: "customer_retention_rate"
+
+  sparse_history_new_product:
+    lever: "Peer benchmarking"
+    action: "Use peer-product benchmark instead of trend; re-evaluate after 8 weeks of data"
+    owner: "Product Team"
+    monitoring_kpi: "cross_sell_revenue"
+
+  abstain_low_confidence:
+    lever: "Human review"
+    action: "Evidence is contradictory — flag for analyst review before acting"
+    owner: "Branch Head"
+    monitoring_kpi: null

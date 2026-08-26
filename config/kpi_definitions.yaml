@@ -1,0 +1,47 @@
+# 4 connected KPIs (primary / driver / outcome / value)
+
+kpis:
+  cross_sell_revenue:
+    label: "Cross-Sell Revenue"
+    role: primary
+    unit: currency
+    table: revenue_transactions
+    value_column: amount
+    filter: "product_category = 'cross_sell'"
+    group_by: [month, branch_id]
+    higher_is_better: true
+
+  lead_conversion_rate:
+    label: "Lead Conversion Rate"
+    role: driver
+    unit: percent
+    table: leads
+    numerator: "status = 'converted'"
+    denominator: "1=1"
+    group_by: [month, branch_id]
+    higher_is_better: true
+
+  customer_retention_rate:
+    label: "Customer Retention Rate"
+    role: outcome
+    unit: percent
+    table: customers
+    numerator: "status = 'active'"
+    denominator: "1=1"
+    group_by: [month, branch_id]
+    higher_is_better: true
+
+  revenue_per_customer:
+    label: "Revenue Per Customer"
+    role: value
+    unit: currency
+    table: revenue_transactions
+    value_column: amount
+    denominator_table: customers
+    group_by: [month, branch_id]
+    higher_is_better: true
+
+materiality_thresholds:
+  low: 0.05
+  medium: 0.10
+  high: 0.20
