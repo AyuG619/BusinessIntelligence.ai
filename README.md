@@ -48,7 +48,7 @@ Restart Streamlit after changing `.env`; configuration is loaded when `llm/clien
 
 ### Command center
 
-The entry page, [ui/app.py](ui/app.py), provides sidebar navigation, demo user selection, date/branch/product/segment filters, cached SQLite loading, live metrics, Plotly trend and product-mix views, a transaction table, CSV download, and deterministic "Ask your data" answers.
+The entry page, [ui/app.py](ui/app.py), provides sidebar navigation, demo user selection, date/branch/product/segment filters, cached SQLite loading, live metrics, Plotly trend and product-mix views, a transaction table, CSV download, and deterministic scope summaries. For conversational analysis, use the dedicated Ask your data page described below.
 
 ### KPI Overview
 
@@ -69,10 +69,20 @@ The entry page, [ui/app.py](ui/app.py), provides sidebar navigation, demo user s
 
 The page also includes Method and model telemetry and KPI contract and lineage expanders.
 
-Conversational mode passes the user's question and the last four question/answer
-pairs into the Groq prompt. It is a guided analytical chatbot rather than an
-open-ended database agent: the selected KPI package remains the governed
-source of facts, while Groq answers the user's question using those facts.
+### Ask your data
+
+[Ask your data](ui/pages/3_Conversational.py) is a dedicated conversational
+banking analyst, not a collection of one-shot KPI buttons. It uses
+`st.chat_input` and `st.chat_message`, preserves the conversation, and passes
+the user's question plus the last four question/answer pairs into a Groq
+prompt. The selected KPI package remains the governed source of facts, while
+Groq answers the user's actual question using the validated context.
+
+The assistant can discuss the current KPI, baseline, movement, drivers,
+evidence, freshness, confidence, recommendations, financial-year comparisons,
+branch scope, and role restrictions. If the context cannot answer a question,
+it identifies the missing information and asks one focused follow-up instead
+of inventing a generic answer.
 
 ### Security & access
 
@@ -152,6 +162,12 @@ same-month-last-year, prior-quarter-average, and prior-rolling-year comparisons
 in Insight Story. The visible period label includes the financial year, for
 example `FY 2026-27 · 2026-07`; the underlying `YYYY-MM` value remains the
 stable calculation key.
+
+The generated database contains two branches. BR-01 and BR-02 each have four
+relationship managers and 60 customers. BR-02 includes 29 leads, 1,074 revenue
+transactions, and the same 36-month transaction history as BR-01. The seeded
+evidence set is intentionally concentrated on BR-01 for the primary demo;
+BR-02 has baseline operational data and limited branch-specific evidence.
 
 ## Feasibility summary
 
