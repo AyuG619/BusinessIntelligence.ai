@@ -1,6 +1,6 @@
 # BusinessIntelligence.ai
 
-BusinessIntelligence.ai is a Streamlit prototype for turning banking KPI movement into an evidence-backed decision:
+BusinessIntelligence.ai is a prototype for turning banking KPI movement into an evidence-backed decision:
 
 ```text
 KPI movement -> deterministic detection -> driver attribution
