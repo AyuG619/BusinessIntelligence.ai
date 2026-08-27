@@ -1,69 +1,163 @@
-# BusinessIntelligence.ai — Banking KPI Insight Engine (Prototype)
+# BusinessIntelligence.ai
 
-A demo-scoped implementation of the pipeline:
+BusinessIntelligence.ai is a Streamlit prototype for turning banking KPI movement into an evidence-backed decision:
 
+```text
+KPI movement -> deterministic detection -> driver attribution
+-> scoped evidence -> confidence/abstention -> narrative -> action -> feedback
 ```
-KPI movement → deterministic detection → driver attribution →
-evidence → confidence/abstention → persona narrative → action → feedback
-```
 
-Built deliberately lean: no FastAPI layer, no vector DB, no forecasting,
-no caching layer, no multi-agent intent routing. Streamlit calls the
-Python modules directly, which read/write a local SQLite database.
-
-## Why it's structured this way
-
-| Layer | Deterministic or LLM? |
-|---|---|
-| KPI calculation, anomaly detection, materiality, contribution analysis, security, confidence scoring | **Deterministic** (SQL/Pandas/stats) |
-| Evidence semantic classification, natural-language narrative, persona adaptation, conversational Q&A | **LLM** |
-
-This boundary is shown explicitly on the "Insight Story" page (Method panel)
-and is the core judging differentiator: the LLM never computes numbers,
-it only explains numbers that were already computed deterministically.
+SQL, Pandas, statistics, access control, confidence scoring, and recommendation eligibility are deterministic. Groq is used only for evidence stance classification and persona-adapted narrative generation. The LLM never calculates KPI values or makes security decisions.
 
 ## Quickstart
 
-```bash
-python -m venv .venv && source .venv/bin/activate   # optional
+Run commands from the repository root:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-cp .env.example .env
-# edit .env and set an LLM_API_KEY (Gemini/OpenAI/Anthropic — see llm/client.py)
-
-python db/init_db.py            # creates db/banking.db and loads schema
-python data/generate_synthetic_data.py   # generates customers/RMs/transactions
-python data/generate_documents.py        # generates ~40 evidence documents
-python data/seed_scenarios.py            # engineers the 5 demo scenarios
+python db/init_db.py
+python data/generate_synthetic_data.py
+python data/generate_documents.py
+python data/seed_scenarios.py
 
 streamlit run ui/app.py
 ```
 
-If you don't set an LLM key, `llm/client.py` falls back to a deterministic
-template-based narrative generator so the app still runs end-to-end offline.
+The setup scripts are intentionally ordered. Synthetic baseline data must be created before the scenario overlay is used.
 
-## Project layout
+## Groq configuration
 
-See the file tree in the repository. Core modules:
+Create `.env` in the repository root:
 
-- `analytics/kpi_calculator.py` — deterministic KPI math (SQL/Pandas)
-- `analytics/detect.py` — baseline, deviation, z-score, materiality
-- `analytics/attribute.py` — recursive contribution / driver-tree attribution
-- `evidence/retrieval.py` — scoped, access-controlled document retrieval (no vector DB)
-- `evidence/corroborate.py` — SUPPORTS/CONTRADICTS/NEUTRAL classification → confidence/abstention
-- `llm/client.py` — thin LLM wrapper with latency/token/cost telemetry
-- `llm/narrative.py` — turns validated analytics + evidence into persona narrative
-- `recommend/engine.py` — maps driver + confidence → recommended action
-- `feedback/feedback.py` — stores "was this useful" feedback
-- `core/security.py` — RBAC entitlements + audit log (RM vs Branch Head vs Admin)
-- `core/telemetry.py` — runtime, model calls, tokens, cost logging
+```env
+LLM_PROVIDER=groq
+LLM_MODEL=qwen/qwen3.8-27b
+LLM_API_KEY=your_groq_api_key
+DB_PATH=db/banking.db
+```
 
-## The 5 demo scenarios
+The client calls Groq's OpenAI-compatible endpoint:
+`https://api.groq.com/openai/v1/chat/completions`.
 
-Seeded by `data/seed_scenarios.py`:
+Restart Streamlit after changing `.env`; configuration is loaded when `llm/client.py` is imported. If the key or provider is unavailable, the app falls back to a deterministic local narrative and keyword evidence classifier. The UI labels that output as offline mode.
 
-- **A — Driver attribution**: Cross-Sell Revenue ↓12%, traced to Credit Cards → Salary Accounts → Unresolved Leads
-- **B — Multi-factor decomposition**: Branch Revenue ↓10% = 50% volume / 30% mix / 20% pricing
-- **C — Contradictory evidence**: Retention ↓, CRM says engagement dropped, market note says pricing changed → LOW CONFIDENCE
-- **D — Sparse history**: Platinum Edge product launched 3 weeks ago → insufficient history → reduced confidence, peer benchmark used
-- **E — Security**: RM-103 can see only their own book; attempting RM-108 data → ACCESS DENIED + audit event
+## User workflow
+
+### Command center
+
+The entry page, [ui/app.py](ui/app.py), provides sidebar navigation, demo user selection, date/branch/product/segment filters, cached SQLite loading, live metrics, Plotly trend and product-mix views, a transaction table, CSV download, and deterministic "Ask your data" answers.
+
+### KPI Overview
+
+[KPI Overview](ui/pages/1_KPI_Overview.py) calculates four live KPI results and groups the result into signal, alert, and data-note tabs.
+
+### Insight Story
+
+[Insight Story](ui/pages/2_Insight_Story.py) is the main judging workflow:
+
+1. Select a KPI or Platinum Edge launch KPI.
+2. Compare the current value with a trailing baseline.
+3. Attribute the movement by product or volume/mix/pricing.
+4. Retrieve scoped evidence from SQLite.
+5. Classify evidence with Groq as SUPPORTS, CONTRADICTS, or NEUTRAL.
+6. Calculate confidence and abstain when evidence is weak or contradictory.
+7. Generate a persona-specific narrative with Groq.
+8. Show a recommended action and capture usefulness feedback.
+
+The page also includes Method and model telemetry and KPI contract and lineage expanders.
+
+### Security & access
+
+[Security Demo](ui/pages/4_Security_Demo.py) demonstrates RM, Branch Head, and Admin access rules. Allowed and denied customer, branch, and sensitive-field checks are written to the SQLite audit log.
+
+## KPI contract
+
+[config/kpi_definitions.yaml](config/kpi_definitions.yaml) defines the four registered KPIs and includes labels, roles, units, source tables, filters, numerator/denominator rules, grouping, direction, materiality thresholds, drivers, lineage, access scope, and intended refresh cadence.
+
+The calculation implementation is in [analytics/kpi_calculator.py](analytics/kpi_calculator.py). The contract is lightweight metadata, not an ORM or semantic-layer runtime.
+
+| KPI | Source | Grain | Main calculation |
+|---|---|---|---|
+| Cross-Sell Revenue | `revenue_transactions` | transaction/month/branch | Sum cross-sell amount |
+| Lead Conversion Rate | `leads` | lead/created-month/branch | Converted leads / all leads |
+| Customer Retention Rate | `customers` | customer/onboarded-month/branch | Active customers / cohort |
+| Revenue Per Customer | `revenue_transactions` + customer ID | transaction/month/branch | Revenue / distinct customers |
+
+## Source registry and freshness
+
+[config/source_registry.yaml](config/source_registry.yaml) records source labels, grain, intended refresh cadence, trust weight, and warning age. Evidence documents carry `created_on`; [evidence/corroborate.py](evidence/corroborate.py) calculates `FRESH`, `STALE`, or `UNKNOWN` using the source warning window. Evidence cards display the status and creation date.
+
+The prototype simulates cadence metadata; it does not run separate ingestion jobs. All synthetic data is stored in one local SQLite file. A production version would connect the registry to ingestion timestamps and freshness checks.
+
+## Personas and actions
+
+[config/personas.yaml](config/personas.yaml) defines Relationship Manager, Branch Head, and Executive personas with different tone and detail levels. [llm/narrative.py](llm/narrative.py) puts the selected persona into the Groq prompt.
+
+Recommendation eligibility remains deterministic and is based on the driver and confidence band. Actions are not yet independently customized by persona; this is an intentional prototype limitation.
+
+## Demo scenarios and expected output
+
+[data/seed_scenarios.py](data/seed_scenarios.py) creates five scenarios:
+
+- **A: Product attribution** — cross-sell revenue declines; Credit Card and unresolved leads appear as drivers.
+- **B: Multi-factor bridge** — revenue movement decomposes into volume, mix, and pricing effects. The three effects should reconstruct the total delta.
+- **C: Conflicting evidence** — retention declines while engagement, pricing, and survey evidence disagree. Expected result: LOW/ABSTAIN confidence and human-review recommendation.
+- **D: Sparse history** — Platinum Edge has current-month-only data. Expected result: sparse-history flag and peer-benchmark recommendation.
+- **E: Security** — RM-103 cannot access RM-108's customer; the denied attempt creates an audit event.
+
+## LLM versus deterministic boundary
+
+| Stage | Implementation | LLM? |
+|---|---|---|
+| KPI calculation | SQL/Pandas | No |
+| Detection | Baseline, z-score, materiality | No |
+| Attribution | Product and volume/mix/pricing arithmetic | No |
+| Evidence retrieval | Scoped SQLite keyword filtering | No |
+| Evidence stance | Groq classification with keyword fallback | Yes |
+| Confidence | Rule-based score and band | No |
+| Recommendation eligibility | Rule-based confidence gate | No |
+| Narrative | Groq persona-adapted explanation | Yes |
+| Security | Deterministic RBAC | No |
+
+## Runtime telemetry
+
+[core/telemetry.py](core/telemetry.py) stores stage duration, model, token estimates, estimated cost, and timestamp in `telemetry_log`.
+
+Insight Story reports the current model and latency, current token/cost estimates, persistent model-call count, persistent pipeline-event count, and aggregate latency/tokens/cost. `model_calls` counts records with a model name; `pipeline_events` includes all timed stages as well as model calls.
+
+## Database
+
+[db/schema.sql](db/schema.sql) creates dimensions (`branches`, `relationship_managers`, `customers`), operational facts (`product_holdings`, `leads`, `revenue_transactions`), evidence/feedback tables, audit and telemetry tables, and `kpi_snapshots`. `kpi_snapshots` exists for a future cache but is not used for headline KPIs.
+
+## Tests
+
+Run:
+
+```powershell
+pytest -q
+```
+
+The suite covers KPI detection, product attribution, volume/mix/pricing decomposition, contradictory evidence, sparse history, confidence-gated recommendations, and RBAC. The current seeded result is **14 passed**.
+
+## Feasibility summary
+
+Implemented:
+
+- Four connected KPIs across transaction, lead, and customer grains.
+- KPI definitions, thresholds, drivers, lineage, access scope, and cadence metadata.
+- Three narrative personas.
+- Multi-factor movement, low-confidence abstention, sparse history, and RBAC scenarios.
+- Evidence freshness status, contribution, confidence, method, and lineage display.
+- Groq/non-Groq processing boundary.
+- Latency, model-call, token, and estimated-cost telemetry.
+
+Still prototype-level:
+
+- Refresh cadence is metadata only; there are no independent source pipelines.
+- Persona-specific actions are not yet distinct.
+- SQLite keyword retrieval is not semantic/vector retrieval.
+- Token counts and costs are estimates, not provider billing records.
+- Demo users and database data are synthetic; production authentication and deployment controls are not included.

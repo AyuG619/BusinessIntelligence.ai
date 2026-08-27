@@ -10,6 +10,10 @@ kpis:
     filter: "product_category = 'cross_sell'"
     group_by: [month, branch_id]
     higher_is_better: true
+    drivers: [product_code, lead_status]
+    lineage: "revenue_transactions.amount filtered by product_category=cross_sell, grouped by month and branch_id"
+    access_scope: "branch aggregate; customer detail restricted by RBAC"
+    refresh_cadence: "daily transactions, monthly KPI view"
 
   lead_conversion_rate:
     label: "Lead Conversion Rate"
@@ -20,6 +24,10 @@ kpis:
     denominator: "1=1"
     group_by: [month, branch_id]
     higher_is_better: true
+    drivers: [lead_status, product_code]
+    lineage: "leads.status=converted divided by all leads, grouped by created month and branch_id"
+    access_scope: "branch aggregate; customer detail restricted by RBAC"
+    refresh_cadence: "daily"
 
   customer_retention_rate:
     label: "Customer Retention Rate"
@@ -30,6 +38,10 @@ kpis:
     denominator: "1=1"
     group_by: [month, branch_id]
     higher_is_better: true
+    drivers: [customer.status, onboarding_cohort]
+    lineage: "customers.status=active divided by onboarding cohort, grouped by onboarded month and branch_id"
+    access_scope: "branch aggregate; customer detail restricted by RBAC"
+    refresh_cadence: "monthly"
 
   revenue_per_customer:
     label: "Revenue Per Customer"
@@ -40,6 +52,10 @@ kpis:
     denominator_table: customers
     group_by: [month, branch_id]
     higher_is_better: true
+    drivers: [amount, customer_id, product_code]
+    lineage: "revenue_transactions.amount divided by distinct revenue customer_id, grouped by month and branch_id"
+    access_scope: "branch aggregate; customer detail restricted by RBAC"
+    refresh_cadence: "daily transactions, monthly KPI view"
 
 materiality_thresholds:
   low: 0.05

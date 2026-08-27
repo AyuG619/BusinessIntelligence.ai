@@ -142,9 +142,21 @@ with st.expander("Method and model telemetry"):
                 f"tokens: {llm_result['input_tokens']}/{llm_result['output_tokens']}, "
                 f"est. cost: ${llm_result['est_cost_usd']}")
     tsum = telemetry_summary()
-    st.caption(f"Session totals — calls: {tsum['total_calls']}, avg latency: {tsum['avg_duration_ms']}ms, "
+    st.caption(f"Session totals — model calls: {tsum['model_calls']}, pipeline events: {tsum['pipeline_events']}, "
+                f"avg latency: {tsum['avg_duration_ms']}ms, "
                 f"tokens: {tsum['total_input_tokens']}/{tsum['total_output_tokens']}, "
                 f"est. cost: ${tsum['total_est_cost_usd']}")
+
+with st.expander("KPI contract and lineage"):
+    if kpi_key == NEW_PRODUCT_KEY:
+        st.caption("Product-scoped Platinum Edge revenue uses the same revenue_transactions source at product grain.")
+    else:
+        kpi_cfg = KPIS[kpi_key]
+        st.markdown(f"**Source:** `{kpi_cfg['table']}`  \n"
+                    f"**Lineage:** {kpi_cfg.get('lineage', 'Defined in analytics/kpi_calculator.py')}  \n"
+                    f"**Drivers:** {', '.join(kpi_cfg.get('drivers', []))}  \n"
+                    f"**Refresh cadence:** {kpi_cfg.get('refresh_cadence', 'Not specified')}  \n"
+                    f"**Access:** {kpi_cfg.get('access_scope', 'RBAC policy applies')}")
 
 section_label("Feedback loop")
 st.subheader("Was this brief useful?")

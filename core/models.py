@@ -53,6 +53,8 @@ class EvidenceItem:
     stance: str                  # SUPPORTS | CONTRADICTS | NEUTRAL
     relevance: float             # 0..1
     snippet: str
+    created_on: Optional[str] = None
+    freshness_status: Optional[str] = None
 
 
 @dataclass

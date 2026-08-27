@@ -1,25 +1,35 @@
 sources:
   crm_notes:
     label: "CRM Notes"
+    grain: "relationship-manager note"
+    refresh_cadence: "weekly"
     trust_weight: 0.9
     freshness_days_warning: 30
 
   lead_records:
     label: "Lead Records"
+    grain: "lead/opportunity"
+    refresh_cadence: "daily"
     trust_weight: 0.9
     freshness_days_warning: 14
 
   campaign_reports:
     label: "Campaign Performance Reports"
+    grain: "campaign report"
+    refresh_cadence: "monthly"
     trust_weight: 0.8
     freshness_days_warning: 30
 
   market_notes:
     label: "Market / Competitive Notes"
+    grain: "market note"
+    refresh_cadence: "weekly"
     trust_weight: 0.6
     freshness_days_warning: 45
 
   customer_surveys:
     label: "Customer Feedback Surveys"
+    grain: "survey response/cohort"
+    refresh_cadence: "quarterly"
     trust_weight: 0.7
     freshness_days_warning: 60

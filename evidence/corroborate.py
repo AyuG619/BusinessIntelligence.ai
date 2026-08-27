@@ -9,12 +9,16 @@ so the app still runs offline and the classification is always auditable.
 confidence_score -> HIGH / MEDIUM / LOW / ABSTAIN
 """
 import pathlib
+import datetime as dt
+import yaml
 from core.models import AttributionResult, EvidenceItem, ConfidenceResult
 from core.telemetry import timed_stage
 from evidence.retrieval import retrieve_for_drivers
 from llm.client import call_llm
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+with open(ROOT / "config" / "source_registry.yaml") as f:
+    _SOURCES = yaml.safe_load(f)["sources"]
 
 CONTRADICT_HINTS = ["stable", "no change", "unaffected", "increased", "improved", "resolved"]
 SUPPORT_HINTS = ["declined", "missed", "delay", "unresolved", "dropped", "churn", "complaint", "gap"]
@@ -78,6 +82,8 @@ def build_confidence(attribution: AttributionResult, branch_id: str = None,
                 all_evidence.append(EvidenceItem(
                     doc_id=doc["doc_id"], title=doc["title"], source_type=doc["source_type"],
                     stance=stance, relevance=relevance, snippet=snippet,
+                    created_on=doc.get("created_on"),
+                    freshness_status=_freshness_status(doc),
                 ))
                 if stance == "SUPPORTS":
                     supports += 1
@@ -125,3 +131,15 @@ def build_confidence(attribution: AttributionResult, branch_id: str = None,
             confidence_band=band,
             rationale=rationale,
         )
+
+
+def _freshness_status(doc: dict) -> str:
+    source = _SOURCES.get(doc.get("source_type"), {})
+    warning_days = source.get("freshness_days_warning")
+    if not warning_days or not doc.get("created_on"):
+        return "UNKNOWN"
+    try:
+        age_days = (dt.date.today() - dt.date.fromisoformat(doc["created_on"])).days
+    except ValueError:
+        return "UNKNOWN"
+    return "FRESH" if age_days <= warning_days else "STALE"

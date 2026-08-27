@@ -61,8 +61,13 @@ def summary(db_path=DB_PATH):
             "SELECT COUNT(*), AVG(duration_ms), SUM(COALESCE(input_tokens,0)), "
             "SUM(COALESCE(output_tokens,0)), SUM(COALESCE(est_cost_usd,0)) FROM telemetry_log"
         ).fetchone()
+        model_calls = conn.execute(
+            "SELECT COUNT(*) FROM telemetry_log WHERE model IS NOT NULL"
+        ).fetchone()[0]
         return {
             "total_calls": row[0] or 0,
+            "pipeline_events": row[0] or 0,
+            "model_calls": model_calls or 0,
             "avg_duration_ms": round(row[1] or 0, 1),
             "total_input_tokens": row[2] or 0,
             "total_output_tokens": row[3] or 0,

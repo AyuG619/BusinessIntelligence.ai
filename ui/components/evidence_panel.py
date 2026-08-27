@@ -12,4 +12,6 @@ def render_evidence_panel(evidence_items):
         with st.container(border=True):
             st.markdown(f"{icon} **{e.title}**  ·  _{e.source_type.replace('_', ' ').title()}_")
             st.caption(e.snippet)
-            st.caption(f"Stance: {e.stance} · Relevance: {e.relevance:.0%} · doc_id: {e.doc_id}")
+            st.caption(f"Stance: {e.stance} · Relevance: {e.relevance:.0%} · "
+                       f"Freshness: {e.freshness_status or 'UNKNOWN'} · "
+                       f"created: {e.created_on or 'unknown'} · doc_id: {e.doc_id}")
