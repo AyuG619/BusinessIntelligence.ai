@@ -69,6 +69,11 @@ The entry page, [ui/app.py](ui/app.py), provides sidebar navigation, demo user s
 
 The page also includes Method and model telemetry and KPI contract and lineage expanders.
 
+Conversational mode passes the user's question and the last four question/answer
+pairs into the Groq prompt. It is a guided analytical chatbot rather than an
+open-ended database agent: the selected KPI package remains the governed
+source of facts, while Groq answers the user's question using those facts.
+
 ### Security & access
 
 [Security Demo](ui/pages/4_Security_Demo.py) demonstrates RM, Branch Head, and Admin access rules. Allowed and denied customer, branch, and sensitive-field checks are written to the SQLite audit log.
@@ -141,6 +146,12 @@ pytest -q
 ```
 
 The suite covers KPI detection, product attribution, volume/mix/pricing decomposition, contradictory evidence, sparse history, confidence-gated recommendations, and RBAC. The current seeded result is **14 passed**.
+
+The synthetic generator creates 36 complete monthly periods. This supports
+same-month-last-year, prior-quarter-average, and prior-rolling-year comparisons
+in Insight Story. The visible period label includes the financial year, for
+example `FY 2026-27 · 2026-07`; the underlying `YYYY-MM` value remains the
+stable calculation key.
 
 ## Feasibility summary
 

@@ -1,113 +1,151 @@
-"""Conversational page. Deliberately NOT a new agent: predefined analytical
-actions run the deterministic pipeline, and a single LLM call formats the
-final answer (or routes free-text questions to the closest predefined action
-using simple keyword matching — no separate intent-classification model).
-"""
-import sys
+"""Domain-grounded conversational banking analytics workspace."""
 import pathlib
+import sys
+
 import streamlit as st
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
-from analytics.kpi_calculator import latest_kpi_result, KPIS  # noqa: E402
-from analytics.detect import detect  # noqa: E402
 from analytics.attribute import attribute_by_product, attribute_retention_drivers  # noqa: E402
-from evidence.corroborate import build_confidence  # noqa: E402
-from recommend.engine import recommend  # noqa: E402
-from llm.narrative import generate_narrative, offline_template_narrative  # noqa: E402
+from analytics.detect import detect  # noqa: E402
+from analytics.kpi_calculator import (  # noqa: E402
+    KPIS,
+    compare_kpi_periods,
+    latest_kpi_result,
+)
 from core.models import InsightPackage  # noqa: E402
 from core.security import DEMO_USERS  # noqa: E402
-from ui.components.theme import inject_theme, page_header, section_label  # noqa: E402
+from evidence.corroborate import build_confidence  # noqa: E402
+from llm.narrative import generate_chat_response  # noqa: E402
+from recommend.engine import recommend  # noqa: E402
+from ui.components.theme import financial_year_label, inject_theme, page_header, section_label  # noqa: E402
 
-st.set_page_config(page_title="Conversational", layout="wide")
+st.set_page_config(page_title="Ask your data", page_icon="💬", layout="wide")
 inject_theme()
-page_header("Guided analysis", "Ask the signal", "Choose a focused analytical action and let the same governed pipeline build the answer.")
+page_header(
+    "Domain assistant",
+    "Ask your data",
+    "A conversational banking analyst grounded in the current KPI, branch scope, evidence, and confidence model.",
+)
+
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = []
+if "conversation_kpi" not in st.session_state:
+    st.session_state.conversation_kpi = "cross_sell_revenue"
 
 user_id = st.session_state.get("user_id", "BH-01")
 persona = st.session_state.get("persona", "branch_head")
 user = DEMO_USERS[user_id]
 branch_id = user["branch_id"] or "BR-01"
 
-st.markdown('<div class="insight-callout">Guided analysis keeps the numbers deterministic. '
-            'The language layer explains validated results; it does not calculate them.</div>', unsafe_allow_html=True)
+section_label("Conversation context")
+context_col, action_col = st.columns([4, 1], gap="large")
+with context_col:
+    kpi_key = st.selectbox(
+        "Anchor the conversation to a KPI",
+        list(KPIS.keys()),
+        index=list(KPIS.keys()).index(st.session_state.conversation_kpi),
+        format_func=lambda key: KPIS[key]["label"],
+        key="conversation_kpi",
+    )
+with action_col:
+    st.write("")
+    if st.button("Clear chat", use_container_width=True):
+        st.session_state.chat_messages = []
+        st.rerun()
 
-ACTIONS = ["Analyze KPI", "Drill into drivers", "Show evidence", "Recommend actions", "Ask a question"]
-section_label("Set the question")
-action = st.radio("Action", ACTIONS, index=4, horizontal=True, label_visibility="collapsed", key="conversation_action")
+try:
+    kpi = latest_kpi_result(kpi_key, branch_id=branch_id)
+    detection = detect(kpi)
+    if kpi_key == "customer_retention_rate":
+        attribution = attribute_retention_drivers(detection)
+    else:
+        attribution = attribute_by_product(detection)
+    top_product = None
+    for driver in attribution.drivers[:1]:
+        if driver.driver_key in ("credit_card", "salary_account", "personal_loan", "platinum_edge"):
+            top_product = driver.driver_key
+    confidence = build_confidence(attribution, branch_id=branch_id, product_code=top_product, user_id=user_id)
+    recommendation = recommend(confidence, branch_id=branch_id, product_code=top_product)
+    comparisons = compare_kpi_periods(kpi_key, branch_id=branch_id)
+except Exception as exc:
+    st.error(f"Unable to build the banking context. Confirm that the database is seeded. {exc}")
+    st.stop()
 
-left, right = st.columns([1.2, 1], gap="large")
-with left:
-    kpi_key = st.selectbox("KPI", list(KPIS.keys()), format_func=lambda k: KPIS[k]["label"], key="conversation_kpi")
-with right:
-    free_text = None
-    if action == "Ask a question":
-        free_text = st.text_input(
-            "Your question", placeholder="Why did cross-sell revenue fall?",
-            key="conversation_question",
-        )
+with st.container(border=True):
+    st.markdown(f"**{kpi.label} · {financial_year_label(kpi.month)} · {kpi.month}**")
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Actual", f"{kpi.actual:,.2f}")
+    metric_cols[1].metric("Baseline", f"{kpi.expected:,.2f}")
+    metric_cols[2].metric("Movement", f"{kpi.change_pct:+.1%}")
+    metric_cols[3].metric("Confidence", confidence.confidence_band)
+    st.caption(f"Scope: {branch_id} · {detection.materiality_band} materiality · {len(confidence.evidence)} evidence items · {attribution.method}")
 
-if action == "Ask a question" and free_text:
-    # naive keyword match to the closest KPI — not an LLM intent classifier
-    if free_text:
-        text_lower = free_text.lower()
-        for k, cfg in KPIS.items():
-            if any(word in text_lower for word in cfg["label"].lower().split()):
-                kpi_key = k
-                break
+context = {
+    "user": user_id,
+    "role": user["role"],
+    "persona": persona,
+    "branch_scope": branch_id,
+    "kpi": {
+        "key": kpi.kpi_key,
+        "label": kpi.label,
+        "period": kpi.month,
+        "financial_year": financial_year_label(kpi.month),
+        "actual": kpi.actual,
+        "baseline": kpi.expected,
+        "change_pct": kpi.change_pct,
+    },
+    "detection": {
+        "z_score": detection.z_score,
+        "materiality": detection.materiality,
+        "materiality_band": detection.materiality_band,
+        "persistence_months": detection.persistence_months,
+        "sparse_history": detection.sparse_history,
+    },
+    "drivers": [
+        {"key": d.driver_key, "label": d.label, "contribution_pct": d.contribution_pct, "sub_drivers": [s.label for s in d.sub_drivers]}
+        for d in attribution.drivers[:5]
+    ],
+    "evidence": [
+        {"title": e.title, "source": e.source_type, "stance": e.stance, "relevance": e.relevance, "freshness": e.freshness_status, "created_on": e.created_on, "snippet": e.snippet}
+        for e in confidence.evidence[:8]
+    ],
+    "confidence": {"score": confidence.confidence_score, "band": confidence.confidence_band, "rationale": confidence.rationale},
+    "recommendation": None if recommendation is None else {"action": recommendation.action, "owner": recommendation.owner, "lever": recommendation.lever, "monitoring_kpi": recommendation.monitoring_kpi},
+    "comparisons": comparisons,
+}
 
-run = st.button("Run analysis", type="primary", use_container_width=True)
+section_label("Chat")
+if not st.session_state.chat_messages:
+    st.info("Ask about the movement, drivers, evidence, comparison periods, customer impact, or next action. The assistant answers from the governed context above.")
 
-if run:
-    if action == "Ask a question" and not free_text:
-        st.warning("Enter a question before running the analysis.")
-        st.stop()
+for message in st.session_state.chat_messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-    try:
-        kpi = latest_kpi_result(kpi_key, branch_id=branch_id)
-        detection = detect(kpi)
-    except Exception as e:
-        st.error(f"Could not compute this KPI — has the data been seeded? {e}")
-        st.stop()
+question = st.chat_input("Ask a banking question about this KPI...")
+if question:
+    st.session_state.chat_messages.append({"role": "user", "content": question})
+    with st.chat_message("user"):
+        st.markdown(question)
 
-    section_label("Result")
-    st.subheader(f"{KPIS[kpi_key]['label']} · {kpi.month}")
-    st.write(f"Actual: **{kpi.actual:,.2f}**, expected **{kpi.expected:,.2f}** "
-             f"({kpi.change_pct:+.1%}), materiality **{detection.materiality_band}**.")
+    package = InsightPackage(
+        confidence=confidence,
+        recommendation=recommendation,
+        persona=persona,
+        question=question,
+        conversation_history=st.session_state.chat_messages[:-1],
+    )
+    with st.chat_message("assistant"):
+        with st.spinner("Reviewing the banking context..."):
+            result = generate_chat_response(package, context)
+        answer = result["text"]
+        if answer.startswith("[Offline mode"):
+            st.warning("Groq was unavailable, so the local deterministic fallback was used.")
+        st.markdown(answer)
+    st.session_state.chat_messages.append({"role": "assistant", "content": answer})
 
-    if action in ("Analyze KPI",):
-        st.info("KPI computed deterministically from SQL/Pandas aggregation — see Insight Story "
-                 "for the full drill-down.")
-
-    if action in ("Drill into drivers", "Show evidence", "Recommend actions", "Ask a question"):
-        if kpi_key == "customer_retention_rate":
-            attribution = attribute_retention_drivers(detection)
-        else:
-            attribution = attribute_by_product(detection)
-        for d_ in attribution.drivers[:5]:
-            st.markdown(f"- **{d_.label}**: {d_.contribution_pct:+.0%}")
-
-    if action in ("Show evidence", "Recommend actions", "Ask a question"):
-        top_product = attribution.drivers[0].driver_key if attribution.drivers else None
-        confidence = build_confidence(attribution, branch_id=branch_id, product_code=top_product, user_id=user_id)
-        st.markdown(f"**Confidence: {confidence.confidence_band}** — {confidence.rationale}")
-        for e in confidence.evidence[:5]:
-            st.caption(f"[{e.stance}] {e.title} ({e.source_type})")
-
-    if action in ("Recommend actions", "Ask a question"):
-        recommendation = None
-        recommendation = recommend(confidence, branch_id=branch_id, product_code=top_product)
-        if recommendation:
-            st.success(f"**Action:** {recommendation.action}  ·  Owner: {recommendation.owner}")
-        else:
-            st.warning("No action recommended — confidence too low.")
-
-    if action == "Ask a question" and free_text:
-        pkg = InsightPackage(confidence=confidence, recommendation=recommendation, persona=persona)
-        result = generate_narrative(pkg)
-        text = result["text"]
-        if text.startswith("[Offline mode"):
-            text = offline_template_narrative(pkg) + "\n\n" + text
-        section_label("Answer")
-        st.subheader(f"Answer to: {free_text}")
-        st.write(text)
+with st.expander("What the assistant knows"):
+    st.write("The assistant can reason over the selected KPI's actual and baseline, materiality and z-score, product or retention drivers, evidence stance and freshness, same-month-last-year and quarter comparisons, confidence, recommendation, branch scope, role, and prior chat messages.")
+    st.caption("It must not invent customer facts, override access restrictions, recalculate KPIs, or present low-confidence hypotheses as established causes.")

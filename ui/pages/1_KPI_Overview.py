@@ -40,6 +40,7 @@ for col, det in zip(cols, detections):
 
 section_label("Attention queue")
 st.subheader("What needs a closer look?")
+st.caption("Signal count is dynamic: every KPI registered in config/kpi_definitions.yaml appears here.")
 alerts = sorted(detections, key=lambda d: d.materiality, reverse=True)
 alerts = [a for a in alerts if a.materiality_band in ("high", "medium")]
 overview_tab, alerts_tab, data_tab = st.tabs(["Signal overview", "Attention queue", "Data note"])

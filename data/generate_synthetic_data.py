@@ -1,5 +1,5 @@
 """Generates baseline synthetic data: branches, RMs, customers, product
-holdings, leads, and 6 months of revenue transactions with normal variance.
+holdings, leads, and 36 months of revenue transactions with normal variance.
 
 Run BEFORE seed_scenarios.py, which overlays the specific engineered
 movements on top of this baseline.
@@ -20,21 +20,11 @@ PRODUCTS_CORE = ["savings_account", "current_account"]
 SEGMENTS = ["mass", "affluent", "platinum"]
 
 MONTHS = []
-today = dt.date.today().replace(day=1)
-for i in range(6, 0, -1):
-    m = (today.replace(day=1) - dt.timedelta(days=1))
-    for _ in range(i - 1):
-        m = (m.replace(day=1) - dt.timedelta(days=1))
-    MONTHS.append(m.strftime("%Y-%m"))
-MONTHS = sorted(set(MONTHS))[-6:]
-if len(MONTHS) < 6:
-    # fallback: build explicitly from today backward
-    MONTHS = []
-    cursor = today
-    for _ in range(6):
-        MONTHS.append(cursor.strftime("%Y-%m"))
-        cursor = (cursor.replace(day=1) - dt.timedelta(days=1)).replace(day=1)
-    MONTHS = sorted(MONTHS)
+cursor = dt.date.today().replace(day=1)
+for _ in range(36):
+    cursor = (cursor.replace(day=1) - dt.timedelta(days=1)).replace(day=1)
+    MONTHS.append(cursor.strftime("%Y-%m"))
+MONTHS = sorted(MONTHS)
 
 CURRENT_MONTH = MONTHS[-1]
 

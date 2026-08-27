@@ -6,7 +6,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
 from analytics.kpi_calculator import (  # noqa: E402
-    latest_kpi_result, KPIS, compute_product_revenue_series, latest_product_kpi_result,
+    latest_kpi_result, KPIS, compute_product_revenue_series, latest_product_kpi_result, compare_kpi_periods,
 )
 from analytics.detect import detect  # noqa: E402
 from analytics.attribute import (  # noqa: E402
@@ -23,7 +23,7 @@ from feedback.feedback import record_feedback, feedback_summary  # noqa: E402
 from ui.components.evidence_panel import render_evidence_panel  # noqa: E402
 from ui.components.confidence_badge import render_confidence_badge  # noqa: E402
 from ui.components.action_card import render_action_card  # noqa: E402
-from ui.components.theme import inject_theme, page_header, section_label  # noqa: E402
+from ui.components.theme import inject_theme, page_header, section_label, financial_year_label  # noqa: E402
 
 st.set_page_config(page_title="Insight Story", layout="wide")
 inject_theme()
@@ -64,7 +64,7 @@ except Exception as e:
     st.stop()
 
 section_label("01 / What changed")
-st.subheader(f"{kpi.label} · {kpi.month}")
+st.subheader(f"{kpi.label} · {financial_year_label(kpi.month)} · {kpi.month}")
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Actual", f"{kpi.actual:,.2f}")
 c2.metric("Expected", f"{kpi.expected:,.2f}")
@@ -72,6 +72,17 @@ c3.metric("Change", f"{kpi.change_pct:+.1%}")
 c4.metric("Materiality", detection.materiality_band.upper())
 st.caption(f"z-score {detection.z_score} · anomalous {detection.is_anomalous} · "
             f"sparse history: {detection.sparse_history} · method: {detection.method}")
+
+with st.expander("Baseline, importance, and period comparisons"):
+    st.write("Expected is the mean of the latest three completed historical periods before the current period. Importance combines percentage change, configured materiality thresholds, z-score anomaly detection, persistence direction, and sparse-history status.")
+    if kpi_key != NEW_PRODUCT_KEY:
+        comparison = compare_kpi_periods(kpi_key, branch_id=branch_id)
+        comparison_cols = st.columns(3)
+        labels = [("Same month last year", "same_month_last_year"), ("Prior-quarter average", "prior_quarter_average"), ("Prior rolling-year average", "rolling_year_average")]
+        for col, (label, key) in zip(comparison_cols, labels):
+            value = comparison.get(key)
+            col.metric(label, "n/a" if value is None else f"{value:,.2f}")
+        st.caption("The comparison values use the same branch scope and KPI definition as the headline result.")
 
 section_label("02 / Why it moved")
 if kpi_key == NEW_PRODUCT_KEY:

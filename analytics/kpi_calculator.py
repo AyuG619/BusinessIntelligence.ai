@@ -159,3 +159,22 @@ def latest_product_kpi_result(product_code: str, label: str, branch_id: str = No
         change_pct=float(change_pct),
         unit="currency",
     )
+
+
+def compare_kpi_periods(kpi_key: str, branch_id: str = None, db_path=DB_PATH) -> dict:
+    """Compare the latest KPI with year-over-year, quarter, and rolling-year references."""
+    df = compute_kpi_series(kpi_key, branch_id, db_path).dropna(subset=["value"])
+    if df.empty:
+        return {}
+    df["month"] = pd.to_datetime(df["month"].astype(str) + "-01")
+    latest = df.iloc[-1]
+    current_month = latest["month"]
+    result = {"current": float(latest["value"]), "month": current_month.strftime("%Y-%m")}
+    for key, mask in {
+        "same_month_last_year": df["month"] == current_month - pd.DateOffset(years=1),
+        "prior_quarter_average": (df["month"] < current_month) & (df["month"] >= current_month - pd.DateOffset(months=3)),
+        "rolling_year_average": (df["month"] < current_month) & (df["month"] >= current_month - pd.DateOffset(months=12)),
+    }.items():
+        values = df.loc[mask, "value"]
+        result[key] = float(values.mean()) if not values.empty else None
+    return result

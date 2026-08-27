@@ -81,3 +81,5 @@ class InsightPackage:
     confidence: ConfidenceResult
     recommendation: Optional[RecommendedAction]
     persona: str
+    question: Optional[str] = None
+    conversation_history: list = field(default_factory=list)

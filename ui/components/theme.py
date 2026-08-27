@@ -1,4 +1,5 @@
 import streamlit as st
+import datetime as dt
 
 
 PALETTE = {
@@ -95,3 +96,10 @@ def page_header(eyebrow: str, title: str, description: str = ""):
 
 def section_label(text: str):
     st.markdown(f'<div class="section-label">{text}</div>', unsafe_allow_html=True)
+
+
+def financial_year_label(period: str) -> str:
+    """Return an Indian-style financial year label for a YYYY-MM period."""
+    year, month = (int(part) for part in period.split("-"))
+    start_year = year if month >= 4 else year - 1
+    return f"FY {start_year}-{str(start_year + 1)[-2:]}"
