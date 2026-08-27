@@ -34,15 +34,18 @@ st.markdown('<div class="insight-callout">Guided analysis keeps the numbers dete
 
 ACTIONS = ["Analyze KPI", "Drill into drivers", "Show evidence", "Recommend actions", "Ask a question"]
 section_label("Set the question")
-action = st.radio("Action", ACTIONS, horizontal=True, label_visibility="collapsed")
+action = st.radio("Action", ACTIONS, index=4, horizontal=True, label_visibility="collapsed", key="conversation_action")
 
 left, right = st.columns([1.2, 1], gap="large")
 with left:
-    kpi_key = st.selectbox("KPI", list(KPIS.keys()), format_func=lambda k: KPIS[k]["label"])
+    kpi_key = st.selectbox("KPI", list(KPIS.keys()), format_func=lambda k: KPIS[k]["label"], key="conversation_kpi")
 with right:
     free_text = None
     if action == "Ask a question":
-        free_text = st.text_input("Your question", placeholder="Why did cross-sell revenue fall?")
+        free_text = st.text_input(
+            "Your question", placeholder="Why did cross-sell revenue fall?",
+            key="conversation_question",
+        )
 
 if action == "Ask a question" and free_text:
     # naive keyword match to the closest KPI — not an LLM intent classifier
@@ -56,6 +59,10 @@ if action == "Ask a question" and free_text:
 run = st.button("Run analysis", type="primary", use_container_width=True)
 
 if run:
+    if action == "Ask a question" and not free_text:
+        st.warning("Enter a question before running the analysis.")
+        st.stop()
+
     try:
         kpi = latest_kpi_result(kpi_key, branch_id=branch_id)
         detection = detect(kpi)
@@ -88,6 +95,7 @@ if run:
             st.caption(f"[{e.stance}] {e.title} ({e.source_type})")
 
     if action in ("Recommend actions", "Ask a question"):
+        recommendation = None
         recommendation = recommend(confidence, branch_id=branch_id, product_code=top_product)
         if recommendation:
             st.success(f"**Action:** {recommendation.action}  ·  Owner: {recommendation.owner}")
@@ -100,6 +108,6 @@ if run:
         text = result["text"]
         if text.startswith("[Offline mode"):
             text = offline_template_narrative(pkg) + "\n\n" + text
-        st.divider()
-        st.markdown(f"**Answer to: _{free_text}_**")
+        section_label("Answer")
+        st.subheader(f"Answer to: {free_text}")
         st.write(text)
