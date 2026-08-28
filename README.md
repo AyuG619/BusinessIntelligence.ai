@@ -116,7 +116,7 @@ conversion totals with SQLite's lead-grain records and reports `RECONCILED` or
 
 [config/personas.yaml](config/personas.yaml) defines Relationship Manager, Branch Head, and Executive personas with different tone and detail levels. [llm/narrative.py](llm/narrative.py) puts the selected persona into the Groq prompt.
 
-Recommendation eligibility remains deterministic and is based on the driver and confidence band. Actions are not yet independently customized by persona; this is an intentional prototype limitation.
+Recommendation eligibility remains deterministic and is based on the driver and confidence band. Action text is also customized by persona: relationship managers receive tactical instructions, branch heads receive operational direction, and executives receive concise strategic framing.
 
 Feedback closes a bounded learning loop: after three ratings for a KPI, the
 useful/not-useful balance can adjust confidence by at most +/-0.10. Evidence

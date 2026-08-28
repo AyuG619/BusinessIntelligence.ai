@@ -7,33 +7,57 @@ actions:
     action: "Prioritize {n} high-value unresolved {product} leads"
     owner: "Relationship Manager"
     monitoring_kpi: "lead_conversion_rate"
+    persona_actions:
+      relationship_manager: "Call {n} unresolved {product} leads today, highest-value first"
+      branch_head: "Direct RM team to close {n} unresolved {product} leads this week; track daily"
+      executive: "{n} unresolved leads are suppressing {product} conversion — RM follow-up already directed"
 
   credit_card_dropoff:
     lever: "Cross-sell campaign"
     action: "Re-engage {n} salary-account customers without a credit card via targeted offer"
     owner: "Branch Head"
     monitoring_kpi: "cross_sell_revenue"
+    persona_actions:
+      relationship_manager: "Offer a credit card to {n} eligible salary-account customers this week"
+      branch_head: "Direct the cross-sell team to re-engage {n} salary-account customers; review uptake daily"
+      executive: "{n} salary-account customers lack a credit card; targeted cross-sell action is required"
 
   pricing_pressure:
     lever: "Pricing review"
     action: "Review competitive pricing for the affected product segment"
     owner: "Product Team"
     monitoring_kpi: "customer_retention_rate"
+    persona_actions:
+      relationship_manager: "Flag price-sensitive customers and log retention risks for product review"
+      branch_head: "Compare RM-level retention and escalate the affected segment's pricing pressure"
+      executive: "Competitive pricing is pressuring retention; initiate a segment-level pricing review"
 
   engagement_decline:
     lever: "Relationship touchpoint"
     action: "Schedule proactive outreach for customers with declining engagement"
     owner: "Relationship Manager"
     monitoring_kpi: "customer_retention_rate"
+    persona_actions:
+      relationship_manager: "Schedule proactive outreach for customers with declining engagement"
+      branch_head: "Assign RMs to the declining-engagement watch list and review contact completion weekly"
+      executive: "Declining engagement is a retention risk; prioritize a branch outreach response"
 
   sparse_history_new_product:
     lever: "Peer benchmarking"
     action: "Use peer-product benchmark instead of trend; re-evaluate after 8 weeks of data"
     owner: "Product Team"
     monitoring_kpi: "cross_sell_revenue"
+    persona_actions:
+      relationship_manager: "Use peer-product benchmarks for customer conversations; reassess after 8 weeks"
+      branch_head: "Track launch uptake against peer products and reassess after 8 weeks of data"
+      executive: "Use peer-product benchmarking until eight weeks of launch data supports a trend"
 
   abstain_low_confidence:
     lever: "Human review"
     action: "Evidence is contradictory — flag for analyst review before acting"
     owner: "Branch Head"
     monitoring_kpi: null
+    persona_actions:
+      relationship_manager: "Pause outreach and request analyst review before acting"
+      branch_head: "Hold branch action and assign an analyst to resolve the conflicting evidence"
+      executive: "Evidence is insufficient for action; require analyst validation before committing resources"

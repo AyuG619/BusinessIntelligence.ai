@@ -67,7 +67,7 @@ try:
         if driver.driver_key in ("credit_card", "salary_account", "personal_loan", "platinum_edge"):
             top_product = driver.driver_key
     confidence = build_confidence(attribution, branch_id=branch_id, product_code=top_product, user_id=user_id)
-    recommendation = recommend(confidence, branch_id=branch_id, product_code=top_product)
+    recommendation = recommend(confidence, branch_id=branch_id, product_code=top_product, persona=persona)
     comparisons = compare_kpi_periods(kpi_key, branch_id=branch_id)
 except Exception as exc:
     st.error(f"Unable to build the banking context. Confirm that the database is seeded. {exc}")

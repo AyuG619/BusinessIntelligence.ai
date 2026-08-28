@@ -38,6 +38,13 @@ def _template_for_driver(driver_key: str) -> str:
     return "engagement_decline"  # generic fallback
 
 
+def _resolve_action_text(tmpl: dict, persona: str, **fmt_kwargs) -> str:
+    """Resolve a persona override while preserving the base template fallback."""
+    persona_map = tmpl.get("persona_actions") or {}
+    template_str = persona_map.get(persona, tmpl["action"])
+    return template_str.format(**fmt_kwargs)
+
+
 def _count_unresolved_leads(product_code: str = None, branch_id: str = None, db_path=DB_PATH) -> int:
     conn = sqlite3.connect(db_path)
     try:
@@ -55,7 +62,8 @@ def _count_unresolved_leads(product_code: str = None, branch_id: str = None, db_
 
 
 def recommend(confidence: ConfidenceResult, branch_id: str = None,
-              product_code: str = None, db_path=DB_PATH) -> RecommendedAction | None:
+              product_code: str = None, persona: str = None,
+              db_path=DB_PATH) -> RecommendedAction | None:
     band = confidence.confidence_band
     top_driver = confidence.attribution.drivers[0] if confidence.attribution.drivers else None
 
@@ -67,14 +75,16 @@ def recommend(confidence: ConfidenceResult, branch_id: str = None,
     if top_driver is not None and top_driver.driver_key == "sparse_history_new_product":
         tmpl = _CFG["sparse_history_new_product"]
         return RecommendedAction(
-            driver_key=top_driver.driver_key, lever=tmpl["lever"], action=tmpl["action"],
+            driver_key=top_driver.driver_key, lever=tmpl["lever"],
+            action=_resolve_action_text(tmpl, persona),
             owner=tmpl["owner"], monitoring_kpi=tmpl["monitoring_kpi"],
         )
 
     if band in ("LOW", "ABSTAIN"):
         tmpl = _CFG["abstain_low_confidence"]
         return RecommendedAction(
-            driver_key="abstain", lever=tmpl["lever"], action=tmpl["action"],
+            driver_key="abstain", lever=tmpl["lever"],
+            action=_resolve_action_text(tmpl, persona),
             owner=tmpl["owner"], monitoring_kpi=tmpl["monitoring_kpi"],
         )
 
@@ -85,7 +95,9 @@ def recommend(confidence: ConfidenceResult, branch_id: str = None,
     tmpl = _CFG[template_key]
 
     n = _count_unresolved_leads(product_code, branch_id, db_path) if "{n}" in tmpl["action"] else None
-    action_text = tmpl["action"].format(n=n or 0, product=product_code or "cross-sell")
+    action_text = _resolve_action_text(
+        tmpl, persona, n=n or 0, product=product_code or "cross-sell"
+    )
 
     return RecommendedAction(
         driver_key=top_driver.driver_key,

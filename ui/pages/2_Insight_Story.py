@@ -142,7 +142,7 @@ section_label("04 / Confidence")
 render_confidence_badge(confidence)
 
 section_label("05 / Recommended response")
-recommendation = recommend(confidence, branch_id=branch_id, product_code=top_product)
+recommendation = recommend(confidence, branch_id=branch_id, product_code=top_product, persona=persona)
 render_action_card(recommendation)
 
 section_label("06 / Executive narrative")
