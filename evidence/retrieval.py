@@ -6,7 +6,7 @@ chain without the sentence-transformers/ChromaDB dependency.
 """
 import sqlite3
 import pathlib
-from core.security import check_customer_access, check_branch_access, AccessDenied
+from core.security import check_branch_access, AccessDenied
 from core.telemetry import timed_stage
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -46,6 +46,25 @@ def retrieve_evidence(driver_key: str, branch_id: str = None, product_code: str 
                 user = get_user(user_id)
                 if user["role"] != "admin":
                     clauses.append("access_level != 'sensitive'")
+                if user["role"] == "relationship_manager":
+                    clauses.append(
+                        "((customer_id IS NOT NULL AND EXISTS ("
+                        "SELECT 1 FROM customers c WHERE c.customer_id = documents.customer_id "
+                        "AND c.rm_id = ?)) OR (customer_id IS NULL AND "
+                        "(rm_id = ? OR (rm_id IS NULL AND "
+                        "(branch_id = ? OR branch_id IS NULL)))))"
+                    )
+                    params.extend([user_id, user_id, user["branch_id"]])
+                elif user["role"] == "branch_head":
+                    clauses.append(
+                        "((customer_id IS NOT NULL AND EXISTS ("
+                        "SELECT 1 FROM customers c WHERE c.customer_id = documents.customer_id "
+                        "AND c.branch_id = ?)) OR (customer_id IS NULL AND "
+                        "(branch_id = ? OR branch_id IS NULL)))"
+                    )
+                    params.extend([user["branch_id"], user["branch_id"]])
+            else:
+                return []
 
             q = f"""
                 SELECT doc_id, source_type, title, body, driver_tags, created_on, access_level

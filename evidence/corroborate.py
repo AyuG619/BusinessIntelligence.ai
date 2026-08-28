@@ -10,11 +10,13 @@ confidence_score -> HIGH / MEDIUM / LOW / ABSTAIN
 """
 import pathlib
 import datetime as dt
+import re
 import yaml
 from core.models import AttributionResult, EvidenceItem, ConfidenceResult
 from core.telemetry import timed_stage
 from evidence.retrieval import retrieve_for_drivers
 from llm.client import call_llm
+from feedback.feedback import confidence_adjustment
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 with open(ROOT / "config" / "source_registry.yaml") as f:
@@ -37,17 +39,11 @@ def _classify_stance(driver_label: str, doc: dict) -> tuple:
     result = call_llm(prompt, stage="evidence_classification", max_tokens=10)
     text = (result.get("text") or "").strip().upper()
 
-    # Real LLMs sometimes add punctuation or a short lead-in even when told
-    # to answer with exactly one word (e.g. "SUPPORTS." or "Answer: NEUTRAL").
-    # Check by substring, most specific label first, before falling back to
-    # the keyword heuristic — an exact-match-only check would silently treat
-    # these as unparseable and skip the real classification.
-    if "CONTRADICT" in text:
-        stance = "CONTRADICTS"
-    elif "SUPPORT" in text:
-        stance = "SUPPORTS"
-    elif "NEUTRAL" in text:
-        stance = "NEUTRAL"
+    # Accept only the requested label, with optional punctuation or "Answer:"
+    # prefix, so negated or prompt-injected text cannot become a stance.
+    match = re.fullmatch(r"(?:ANSWER:\s*)?(SUPPORTS|CONTRADICTS|NEUTRAL)[.!]?", text)
+    if match:
+        stance = match.group(1)
     else:
         # offline / unparseable fallback: keyword heuristic
         body_lower = doc["body"].lower()
@@ -97,7 +93,12 @@ def build_confidence(attribution: AttributionResult, branch_id: str = None,
         base += min(detection.materiality, 0.3)
         base += min(supports * 0.08, 0.3)
         base -= min(contradicts * 0.15, 0.4)
+        feedback_delta = confidence_adjustment(detection.kpi.kpi_key)
+        base += feedback_delta
         score = max(0.0, min(1.0, base))
+        if not all_evidence:
+            # Materiality alone cannot establish a driver without traceable evidence.
+            score = min(score, 0.2)
 
         rationale_parts = []
         if detection.sparse_history:
@@ -111,9 +112,13 @@ def build_confidence(attribution: AttributionResult, branch_id: str = None,
         else:
             rationale_parts.append("no directly matching evidence found")
         rationale_parts.append(f"materiality={detection.materiality_band}")
+        if feedback_delta:
+            rationale_parts.append(f"feedback adjustment={feedback_delta:+.3f}")
         rationale = "; ".join(rationale_parts)
 
-        if contradicts > 0 and supports > 0 and abs(supports - contradicts) <= 1:
+        if not all_evidence:
+            band = "ABSTAIN"
+        elif contradicts > 0 and supports > 0 and abs(supports - contradicts) <= 1:
             band = "LOW"
         elif score >= 0.7:
             band = "HIGH"

@@ -17,6 +17,7 @@ with open(POLICY_PATH) as f:
 
 ROLES = _POLICY["roles"]
 DEMO_USERS = {u["user_id"]: u for u in _POLICY["demo_users"]}
+SENSITIVE_FIELDS = {"income_band"}
 
 
 class AccessDenied(Exception):
@@ -94,16 +95,20 @@ def check_branch_access(user_id: str, target_branch_id: str, db_path=DB_PATH) ->
 def check_sensitive_field_access(user_id: str, field_name: str, db_path=DB_PATH) -> bool:
     user = get_user(user_id)
     role = ROLES[user["role"]]
-    allowed = "sensitive_income_data" not in role.get("denied", [])
     conn = sqlite3.connect(db_path)
     try:
+        known_field = field_name in SENSITIVE_FIELDS
+        allowed = known_field and "sensitive_income_data" not in role.get("denied", [])
+        reason = "" if known_field else "field is not registered as sensitive"
+        if not allowed and known_field:
+            reason = "role does not include sensitive_income_data"
         _log(conn, user_id, f"view_field:{field_name}", field_name,
              "ALLOWED" if allowed else "DENIED",
-             "" if allowed else "role does not include sensitive_income_data")
+             reason)
     finally:
         conn.close()
     if not allowed:
-        raise AccessDenied("Sensitive field access denied for this role")
+        raise AccessDenied("Sensitive field access denied or field is not registered")
     return True
 
 

@@ -1,4 +1,11 @@
 sources:
+  marketing_campaigns_csv:
+    label: "Marketing Campaign Export"
+    grain: "campaign/month/branch"
+    refresh_cadence: "monthly"
+    trust_weight: 0.75
+    freshness_days_warning: 45
+
   crm_notes:
     label: "CRM Notes"
     grain: "relationship-manager note"

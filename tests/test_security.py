@@ -43,6 +43,13 @@ def test_unknown_user_raises():
 
 
 @pytest.mark.skipif(not DB_PATH.exists(), reason="db/banking.db not initialized — run setup scripts first")
+def test_unknown_sensitive_field_is_denied():
+    with pytest.raises(AccessDenied):
+        from core.security import check_sensitive_field_access
+        check_sensitive_field_access("ADMIN-01", "ssn")
+
+
+@pytest.mark.skipif(not DB_PATH.exists(), reason="db/banking.db not initialized — run setup scripts first")
 def test_branch_head_cannot_access_other_branch():
     with pytest.raises(AccessDenied):
         check_branch_access("BH-01", "BR-02")

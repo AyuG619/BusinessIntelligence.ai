@@ -32,7 +32,7 @@ page_header("Decision brief", "Insight Story", "Move from a KPI signal to the ev
 user_id = st.session_state.get("user_id", "BH-01")
 persona = st.session_state.get("persona", "branch_head")
 user = DEMO_USERS[user_id]
-branch_id = user["branch_id"] or "BR-01"
+branch_id = user["branch_id"]
 
 NEW_PRODUCT_KEY = "__platinum_edge_launch__"
 

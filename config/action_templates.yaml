@@ -22,7 +22,7 @@ actions:
 
   engagement_decline:
     lever: "Relationship touchpoint"
-    action: "Schedule proactive outreach for {n} customers with declining engagement"
+    action: "Schedule proactive outreach for customers with declining engagement"
     owner: "Relationship Manager"
     monitoring_kpi: "customer_retention_rate"
 

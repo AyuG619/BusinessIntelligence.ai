@@ -17,11 +17,16 @@ from analytics.attribute import (  # noqa: E402
 )
 from evidence.corroborate import build_confidence  # noqa: E402
 from recommend.engine import recommend  # noqa: E402
+from evidence.retrieval import retrieve_evidence  # noqa: E402
 
 DB_PATH = ROOT / "db" / "banking.db"
 pytestmark = pytest.mark.skipif(
     not DB_PATH.exists(), reason="db/banking.db not initialized — run setup scripts first"
 )
+
+
+def test_evidence_requires_an_authenticated_identity():
+    assert retrieve_evidence("credit_card") == []
 
 
 def test_scenario_a_driver_attribution():

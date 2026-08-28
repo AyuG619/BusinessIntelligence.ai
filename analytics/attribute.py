@@ -35,10 +35,10 @@ def attribute_by_product(detection: DetectionResult, db_path=DB_PATH) -> Attribu
         try:
             months_q = """
                 SELECT DISTINCT month FROM revenue_transactions
-                WHERE product_category = 'cross_sell'
+                WHERE product_category = 'cross_sell' AND month <= ?
                 ORDER BY month DESC LIMIT 4
             """
-            months = pd.read_sql_query(months_q, conn)["month"].tolist()
+            months = pd.read_sql_query(months_q, conn, params=(kpi.month,))["month"].tolist()
             if not months:
                 return AttributionResult(detection=detection, drivers=[])
             current_month = months[0]
@@ -199,9 +199,12 @@ def attribute_volume_mix_price(detection: DetectionResult, db_path=DB_PATH) -> A
 
             months_q = f"""
                 SELECT DISTINCT month FROM revenue_transactions
-                WHERE 1=1 {branch_clause} ORDER BY month DESC LIMIT 2
+                WHERE product_category = 'cross_sell' AND month <= ? {branch_clause}
+                ORDER BY month DESC LIMIT 2
             """
-            months = pd.read_sql_query(months_q, conn, params=params_branch)["month"].tolist()
+            months = pd.read_sql_query(
+                months_q, conn, params=(kpi.month, *params_branch)
+            )["month"].tolist()
             if len(months) < 2:
                 return AttributionResult(detection=detection, drivers=[])
             cur_month, prior_month = months[0], months[1]
@@ -209,7 +212,8 @@ def attribute_volume_mix_price(detection: DetectionResult, db_path=DB_PATH) -> A
             def per_product(month):
                 q = f"""
                     SELECT product_code, SUM(volume_units) AS units, SUM(amount) AS revenue
-                    FROM revenue_transactions WHERE month = ? {branch_clause}
+                    FROM revenue_transactions
+                    WHERE product_category = 'cross_sell' AND month = ? {branch_clause}
                     GROUP BY product_code
                 """
                 df = pd.read_sql_query(q, conn, params=(month, *params_branch))

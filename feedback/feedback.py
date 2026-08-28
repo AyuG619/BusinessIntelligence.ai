@@ -51,3 +51,20 @@ def recent_feedback(limit: int = 10, db_path=DB_PATH):
         return [dict(zip(cols, r)) for r in rows]
     finally:
         conn.close()
+
+
+def confidence_adjustment(kpi_key: str, db_path=DB_PATH, minimum_ratings: int = 3) -> float:
+    """Return a capped confidence adjustment from prior KPI ratings."""
+    conn = sqlite3.connect(db_path)
+    try:
+        total, useful = conn.execute(
+            "SELECT COUNT(*), COALESCE(SUM(useful), 0) FROM feedback "
+            "WHERE insight_ref LIKE ?",
+            (f"{kpi_key}|%",),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if total < minimum_ratings:
+        return 0.0
+    return max(-0.1, min(0.1, ((2 * useful) - total) / total * 0.1))

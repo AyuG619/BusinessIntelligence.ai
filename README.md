@@ -107,11 +107,21 @@ The calculation implementation is in [analytics/kpi_calculator.py](analytics/kpi
 
 The prototype simulates cadence metadata; it does not run separate ingestion jobs. All synthetic data is stored in one local SQLite file. A production version would connect the registry to ingestion timestamps and freshness checks.
 
+The prototype also includes a separate `data/marketing_campaigns.csv` export
+at campaign/month/branch grain. `analytics/reconciliation.py` compares its
+conversion totals with SQLite's lead-grain records and reports `RECONCILED` or
+`REVIEW`, including source as-of time and grain.
+
 ## Personas and actions
 
 [config/personas.yaml](config/personas.yaml) defines Relationship Manager, Branch Head, and Executive personas with different tone and detail levels. [llm/narrative.py](llm/narrative.py) puts the selected persona into the Groq prompt.
 
 Recommendation eligibility remains deterministic and is based on the driver and confidence band. Actions are not yet independently customized by persona; this is an intentional prototype limitation.
+
+Feedback closes a bounded learning loop: after three ratings for a KPI, the
+useful/not-useful balance can adjust confidence by at most +/-0.10. Evidence
+requirements and contradiction rules still take precedence, and any applied
+adjustment is recorded in the confidence rationale.
 
 ## Demo scenarios and expected output
 
@@ -155,7 +165,7 @@ Run:
 pytest -q
 ```
 
-The suite covers KPI detection, product attribution, volume/mix/pricing decomposition, contradictory evidence, sparse history, confidence-gated recommendations, and RBAC. The current seeded result is **14 passed**.
+The suite covers KPI detection, product attribution, volume/mix/pricing decomposition, contradictory evidence, sparse history, confidence-gated recommendations, RBAC, source reconciliation, and feedback adjustment.
 
 The synthetic generator creates 36 complete monthly periods. This supports
 same-month-last-year, prior-quarter-average, and prior-rolling-year comparisons

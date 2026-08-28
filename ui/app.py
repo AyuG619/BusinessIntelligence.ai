@@ -36,17 +36,35 @@ inject_theme()
 
 
 @st.cache_data(show_spinner=False)
-def load_dashboard_data(db_path: str, modified_at: float) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_dashboard_data(db_path: str, modified_at: float, user_id: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Load the dashboard's denormalized view and customer dimension."""
     with sqlite3.connect(db_path) as conn:
+        user = DEMO_USERS[user_id]
+        scope_clause = ""
+        params = []
+        if user["role"] == "relationship_manager":
+            scope_clause = "WHERE r.rm_id = ?"
+            params.append(user_id)
+        elif user["role"] == "branch_head":
+            scope_clause = "WHERE r.branch_id = ?"
+            params.append(user["branch_id"])
         transactions = pd.read_sql_query(
             """SELECT txn_date, month, branch_id, product_code, product_category,
                       customer_id, amount, volume_units, unit_price
-               FROM revenue_transactions ORDER BY txn_date""",
-            conn,
+               FROM revenue_transactions r """ + scope_clause + " ORDER BY txn_date",
+            conn, params=params,
         )
+        customer_scope = ""
+        customer_params = []
+        if user["role"] == "relationship_manager":
+            customer_scope = "WHERE rm_id = ?"
+            customer_params.append(user_id)
+        elif user["role"] == "branch_head":
+            customer_scope = "WHERE branch_id = ?"
+            customer_params.append(user["branch_id"])
         customers = pd.read_sql_query(
-            "SELECT customer_id, branch_id, segment, status FROM customers", conn
+            "SELECT customer_id, branch_id, segment, status FROM customers " + customer_scope,
+            conn, params=customer_params,
         )
     return transactions, customers
 
@@ -105,7 +123,7 @@ if not DB_PATH.exists():
     st.error("The dashboard data file is missing. Run the database setup scripts from README.md, then refresh this page.")
     st.stop()
 
-transactions, customers = load_dashboard_data(str(DB_PATH), DB_PATH.stat().st_mtime)
+transactions, customers = load_dashboard_data(str(DB_PATH), DB_PATH.stat().st_mtime, user_id)
 transactions["txn_date"] = pd.to_datetime(transactions["txn_date"])
 transactions = transactions.merge(customers[["customer_id", "segment"]], on="customer_id", how="left")
 
