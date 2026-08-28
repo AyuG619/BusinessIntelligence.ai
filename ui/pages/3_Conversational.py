@@ -12,12 +12,13 @@ from analytics.detect import detect  # noqa: E402
 from analytics.kpi_calculator import (  # noqa: E402
     KPIS,
     compare_kpi_periods,
+    compare_kpi_by_scope,
     latest_kpi_result,
 )
 from core.models import InsightPackage  # noqa: E402
 from core.security import DEMO_USERS  # noqa: E402
 from evidence.corroborate import build_confidence  # noqa: E402
-from llm.narrative import generate_chat_response  # noqa: E402
+from llm.narrative import generate_chat_response, offline_chat_response  # noqa: E402
 from recommend.engine import recommend  # noqa: E402
 from ui.components.theme import financial_year_label, inject_theme, page_header, section_label  # noqa: E402
 
@@ -38,6 +39,7 @@ user_id = st.session_state.get("user_id", "BH-01")
 persona = st.session_state.get("persona", "branch_head")
 user = DEMO_USERS[user_id]
 branch_id = user["branch_id"]
+scope_label = branch_id or "all branches"
 
 section_label("Conversation context")
 context_col, action_col = st.columns([4, 1], gap="large")
@@ -69,6 +71,11 @@ try:
     confidence = build_confidence(attribution, branch_id=branch_id, product_code=top_product, user_id=user_id)
     recommendation = recommend(confidence, branch_id=branch_id, product_code=top_product, persona=persona)
     comparisons = compare_kpi_periods(kpi_key, branch_id=branch_id)
+    scope_comparisons = {}
+    if user["role"] == "admin":
+        scope_comparisons["branches"] = compare_kpi_by_scope(kpi_key, "branch")
+    elif user["role"] == "branch_head":
+        scope_comparisons["rms"] = compare_kpi_by_scope(kpi_key, "rm", branch_id=branch_id)
 except Exception as exc:
     st.error(f"Unable to build the banking context. Confirm that the database is seeded. {exc}")
     st.stop()
@@ -80,13 +87,13 @@ with st.container(border=True):
     metric_cols[1].metric("Baseline", f"{kpi.expected:,.2f}")
     metric_cols[2].metric("Movement", f"{kpi.change_pct:+.1%}")
     metric_cols[3].metric("Confidence", confidence.confidence_band)
-    st.caption(f"Scope: {branch_id} · {detection.materiality_band} materiality · {len(confidence.evidence)} evidence items · {attribution.method}")
+    st.caption(f"Scope: {scope_label} · {detection.materiality_band} materiality · {len(confidence.evidence)} evidence items · {attribution.method}")
 
 context = {
     "user": user_id,
     "role": user["role"],
     "persona": persona,
-    "branch_scope": branch_id,
+    "branch_scope": scope_label,
     "kpi": {
         "key": kpi.kpi_key,
         "label": kpi.label,
@@ -114,6 +121,7 @@ context = {
     "confidence": {"score": confidence.confidence_score, "band": confidence.confidence_band, "rationale": confidence.rationale},
     "recommendation": None if recommendation is None else {"action": recommendation.action, "owner": recommendation.owner, "lever": recommendation.lever, "monitoring_kpi": recommendation.monitoring_kpi},
     "comparisons": comparisons,
+    "scope_comparisons": scope_comparisons,
 }
 
 section_label("Chat")
@@ -143,6 +151,7 @@ if question:
         answer = result["text"]
         if answer.startswith("[Offline mode"):
             st.warning("Groq was unavailable, so the local deterministic fallback was used.")
+            answer = offline_chat_response(package, context)
         st.markdown(answer)
     st.session_state.chat_messages.append({"role": "assistant", "content": answer})
 

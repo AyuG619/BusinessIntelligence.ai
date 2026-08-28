@@ -49,7 +49,7 @@ def load_dashboard_data(db_path: str, modified_at: float, user_id: str) -> tuple
             scope_clause = "WHERE r.branch_id = ?"
             params.append(user["branch_id"])
         transactions = pd.read_sql_query(
-            """SELECT txn_date, month, branch_id, product_code, product_category,
+            """SELECT txn_date, month, branch_id, rm_id, product_code, product_category,
                       customer_id, amount, volume_units, unit_price
                FROM revenue_transactions r """ + scope_clause + " ORDER BY txn_date",
             conn, params=params,
@@ -73,24 +73,6 @@ def format_value(value: float, unit: str = "currency") -> str:
     return f"{value:,.0f}" if unit == "currency" else f"{value:.1%}"
 
 
-def ask_data(question: str, data: pd.DataFrame) -> str:
-    """Return a deterministic answer from the currently filtered dataset."""
-    if data.empty:
-        return "There is no data in the current filter scope. Broaden the filters and try again."
-    question = question.lower()
-    revenue = data["amount"].sum()
-    if "product" in question or "best" in question or "top" in question:
-        top = data.groupby("product_code")["amount"].sum().idxmax()
-        value = data.groupby("product_code")["amount"].sum().max()
-        return f"{top.replace('_', ' ').title()} leads the current scope with {value:,.0f} in revenue."
-    if "region" in question or "branch" in question:
-        top = data.groupby("branch_id")["amount"].sum().idxmax()
-        return f"{top} is the strongest branch in the current scope, contributing {data.loc[data.branch_id == top, 'amount'].sum():,.0f}."
-    if "volume" in question or "unit" in question:
-        return f"The filtered scope contains {data['volume_units'].sum():,.0f} units across {data['customer_id'].nunique():,} customers."
-    return f"The current scope contains {len(data):,} transactions and {revenue:,.0f} in revenue. Ask about products, branches, volume, or customers."
-
-
 def metric_card(label: str, value: str, delta: str, tone: str = "neutral") -> None:
     st.markdown(
         f'<div class="metric-card"><div class="metric-label">{label}</div>'
@@ -99,9 +81,6 @@ def metric_card(label: str, value: str, delta: str, tone: str = "neutral") -> No
         unsafe_allow_html=True,
     )
 
-
-if "dashboard_question" not in st.session_state:
-    st.session_state.dashboard_question = ""
 
 st.sidebar.markdown("## BI / INSIGHT")
 st.sidebar.caption("Command center · live banking performance")
@@ -117,7 +96,12 @@ st.sidebar.markdown("### Workspace")
 user_id = st.sidebar.selectbox("User", list(DEMO_USERS), key="dashboard_user")
 user = DEMO_USERS[user_id]
 st.session_state.user_id = user_id
+st.session_state.persona = "executive" if user["role"] == "admin" else user["role"]
 st.sidebar.caption(f"{user['role'].replace('_', ' ').title()} · {user['branch_id'] or 'All branches'}")
+scope_label = "all branches" if user["role"] == "admin" else (
+    "own customers" if user["role"] == "relationship_manager" else "all customers in own branch"
+)
+st.sidebar.caption(f"Access scope: {scope_label}")
 
 if not DB_PATH.exists():
     st.error("The dashboard data file is missing. Run the database setup scripts from README.md, then refresh this page.")
@@ -195,14 +179,5 @@ with product_tab:
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 with table_tab:
     st.dataframe(filtered.sort_values("txn_date", ascending=False).head(100), use_container_width=True, hide_index=True)
-
-st.markdown('<div class="section-label">Ask your data</div>', unsafe_allow_html=True)
-question_col, button_col = st.columns([5, 1])
-with question_col:
-    question = st.text_input("Question", placeholder="Which product is leading this scope?", label_visibility="collapsed", key="dashboard_question")
-with button_col:
-    ask = st.button("Ask", type="primary", use_container_width=True)
-if ask and question:
-    st.markdown(f'<div class="insight-callout"><strong>Answer</strong><br>{ask_data(question, filtered)}</div>', unsafe_allow_html=True)
 
 st.caption(f"Showing {len(filtered):,} of {len(transactions):,} transactions · Data updates from local SQLite records")
