@@ -24,7 +24,8 @@ def _connect(db_path):
     return sqlite3.connect(db_path)
 
 
-def compute_kpi_series(kpi_key: str, branch_id: str = None, db_path=DB_PATH) -> pd.DataFrame:
+def compute_kpi_series(kpi_key: str, branch_id: str = None, db_path=DB_PATH,
+                       rm_id: str = None) -> pd.DataFrame:
     """Returns a monthly time series for a KPI, optionally scoped to a branch.
 
     Columns: month, value
@@ -38,9 +39,10 @@ def compute_kpi_series(kpi_key: str, branch_id: str = None, db_path=DB_PATH) -> 
                 FROM revenue_transactions
                 WHERE {cfg['filter']}
                 {"AND branch_id = ?" if branch_id else ""}
+                {"AND rm_id = ?" if rm_id else ""}
                 GROUP BY month ORDER BY month
             """
-            params = (branch_id,) if branch_id else ()
+            params = tuple(value for value in (branch_id, rm_id) if value)
             df = pd.read_sql_query(q, conn, params=params)
 
         elif kpi_key == "lead_conversion_rate":
@@ -49,9 +51,10 @@ def compute_kpi_series(kpi_key: str, branch_id: str = None, db_path=DB_PATH) -> 
                        SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) AS value
                 FROM leads
                 WHERE 1=1 {"AND branch_id = ?" if branch_id else ""}
+                {"AND rm_id = ?" if rm_id else ""}
                 GROUP BY month ORDER BY month
             """
-            params = (branch_id,) if branch_id else ()
+            params = tuple(value for value in (branch_id, rm_id) if value)
             df = pd.read_sql_query(q, conn, params=params)
 
         elif kpi_key == "customer_retention_rate":
@@ -60,9 +63,10 @@ def compute_kpi_series(kpi_key: str, branch_id: str = None, db_path=DB_PATH) -> 
                        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) AS value
                 FROM customers
                 WHERE 1=1 {"AND branch_id = ?" if branch_id else ""}
+                {"AND rm_id = ?" if rm_id else ""}
                 GROUP BY month ORDER BY month
             """
-            params = (branch_id,) if branch_id else ()
+            params = tuple(value for value in (branch_id, rm_id) if value)
             df = pd.read_sql_query(q, conn, params=params)
 
         elif kpi_key == "revenue_per_customer":
@@ -70,9 +74,10 @@ def compute_kpi_series(kpi_key: str, branch_id: str = None, db_path=DB_PATH) -> 
                 SELECT r.month AS month, SUM(r.amount) * 1.0 / COUNT(DISTINCT r.customer_id) AS value
                 FROM revenue_transactions r
                 WHERE 1=1 {"AND r.branch_id = ?" if branch_id else ""}
+                {"AND r.rm_id = ?" if rm_id else ""}
                 GROUP BY r.month ORDER BY r.month
             """
-            params = (branch_id,) if branch_id else ()
+            params = tuple(value for value in (branch_id, rm_id) if value)
             df = pd.read_sql_query(q, conn, params=params)
         else:
             raise ValueError(f"Unknown kpi_key: {kpi_key}")
@@ -112,6 +117,41 @@ def latest_kpi_result(kpi_key: str, branch_id: str = None, db_path=DB_PATH) -> K
 
 def all_latest_kpis(branch_id: str = None, db_path=DB_PATH) -> list:
     return [latest_kpi_result(k, branch_id, db_path) for k in KPIS.keys()]
+
+
+def compare_kpi_by_scope(kpi_key: str, scope: str, branch_id: str = None,
+                         db_path=DB_PATH) -> list:
+    """Return latest KPI values grouped by authorized branch or RM scope."""
+    conn = _connect(db_path)
+    try:
+        column = "branch_id" if scope == "branch" else "rm_id"
+        clauses = ["1=1"]
+        params = []
+        if branch_id:
+            clauses.append(f"{column if scope == 'branch' else 'branch_id'} = ?")
+            params.append(branch_id)
+        ids = [row[0] for row in conn.execute(
+            f"SELECT DISTINCT {column} FROM revenue_transactions WHERE {' AND '.join(clauses)} ORDER BY {column}",
+            params,
+        ).fetchall()]
+    finally:
+        conn.close()
+
+    return [
+        {"id": identifier, "kpi": latest_kpi_result(
+            kpi_key,
+            branch_id=identifier if scope == "branch" else branch_id,
+            db_path=db_path,
+        ).actual if scope == "branch" else _latest_kpi_for_rm(kpi_key, branch_id, identifier, db_path)}
+        for identifier in ids
+    ]
+
+
+def _latest_kpi_for_rm(kpi_key: str, branch_id: str, rm_id: str, db_path=DB_PATH) -> float:
+    df = compute_kpi_series(kpi_key, branch_id=branch_id, db_path=db_path, rm_id=rm_id)
+    if df.empty:
+        return 0.0
+    return float(df.iloc[-1]["value"])
 
 
 def compute_product_revenue_series(product_code: str, branch_id: str = None, db_path=DB_PATH) -> pd.DataFrame:

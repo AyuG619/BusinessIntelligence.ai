@@ -14,6 +14,7 @@ from analytics.attribute import (  # noqa: E402
     attribute_new_product_launch,
 )
 from evidence.corroborate import build_confidence  # noqa: E402
+from analytics.reconciliation import reconcile_marketing  # noqa: E402
 from recommend.engine import recommend  # noqa: E402
 from llm.narrative import generate_narrative, offline_template_narrative  # noqa: E402
 from core.models import InsightPackage  # noqa: E402
@@ -24,6 +25,8 @@ from ui.components.evidence_panel import render_evidence_panel  # noqa: E402
 from ui.components.confidence_badge import render_confidence_badge  # noqa: E402
 from ui.components.action_card import render_action_card  # noqa: E402
 from ui.components.theme import inject_theme, page_header, section_label, financial_year_label  # noqa: E402
+
+DB_PATH = ROOT / "db" / "banking.db"
 
 st.set_page_config(page_title="Insight Story", layout="wide")
 inject_theme()
@@ -118,11 +121,28 @@ if top_product is None:
 confidence = build_confidence(attribution, branch_id=branch_id, product_code=top_product, user_id=user_id)
 render_evidence_panel(confidence.evidence)
 
+if kpi_key == "cross_sell_revenue":
+    with st.expander("Cross-source reconciliation — marketing CSV vs. CRM leads"):
+        recon = reconcile_marketing(branch_id, kpi.month, DB_PATH)
+        st.caption(
+            "Marketing system (campaign/month/branch grain, monthly refresh) vs. "
+            "CRM lead records (lead grain, daily refresh) — reconciled at query time."
+        )
+        st.json(recon)
+        if recon["status"] == "REVIEW":
+            st.warning(
+                f"Conversion gap of {recon['conversion_gap']} between marketing-reported "
+                "and CRM-confirmed conversions — treat marketing figures as unverified "
+                "until reconciled by ops."
+            )
+        else:
+            st.success("Marketing and CRM conversion counts reconcile for this period.")
+
 section_label("04 / Confidence")
 render_confidence_badge(confidence)
 
 section_label("05 / Recommended response")
-recommendation = recommend(confidence, branch_id=branch_id, product_code=top_product)
+recommendation = recommend(confidence, branch_id=branch_id, product_code=top_product, persona=persona)
 render_action_card(recommendation)
 
 section_label("06 / Executive narrative")

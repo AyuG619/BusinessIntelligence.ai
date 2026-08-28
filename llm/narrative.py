@@ -107,6 +107,66 @@ Answer the user now. For follow-up questions, refer to the previous conversation
     return call_llm(prompt, stage="llm_chat", max_tokens=450)
 
 
+def offline_chat_response(pkg: InsightPackage, context: dict) -> str:
+    """Answer common questions from validated context without an LLM."""
+    question = (pkg.question or "").lower()
+    kpi = context["kpi"]
+    detection = context["detection"]
+    drivers = context.get("drivers") or []
+    evidence = context.get("evidence") or []
+    recommendation = context.get("recommendation")
+    comparisons = context.get("comparisons") or {}
+    scope_comparisons = context.get("scope_comparisons") or {}
+
+    if "branch" in question and any(term in question for term in ("compare", "comparison", "performance", "better")):
+        branches = scope_comparisons.get("branches")
+        if not branches:
+            return "Branch comparison is not available for your role or current scope."
+        details = "; ".join(f"{item['id']}: {item['kpi']:,.2f}" for item in branches)
+        best = max(branches, key=lambda item: item["kpi"])
+        return f"Branch KPI comparison for {kpi['label']}: {details}. {best['id']} is highest for this KPI."
+
+    if ("rm" in question or "manager" in question) and any(term in question for term in ("compare", "comparison", "performance", "better")):
+        rms = scope_comparisons.get("rms")
+        if not rms:
+            return "RM comparison is not available for your role or current scope."
+        details = "; ".join(f"{item['id']}: {item['kpi']:,.2f}" for item in rms)
+        best = max(rms, key=lambda item: item["kpi"])
+        return f"RM KPI comparison for {kpi['label']}: {details}. {best['id']} is highest for this KPI."
+
+    if any(term in question for term in ("why", "driver", "cause", "evidence")):
+        driver_text = ", ".join(driver["label"] for driver in drivers[:3]) or "no drivers were identified"
+        evidence_text = f" {len(evidence)} scoped evidence item(s) were retrieved."
+        if context["confidence"]["band"] in ("LOW", "ABSTAIN"):
+            evidence_text += " The confidence is low, so these are hypotheses rather than established causes."
+        return f"{kpi['label']} moved {kpi['change_pct']:+.1%} versus baseline. The leading drivers are {driver_text}.{evidence_text}"
+
+    if any(term in question for term in ("action", "next", "recommend", "do")):
+        if not recommendation:
+            return "No action is recommended until the evidence is reviewed."
+        return f"Recommended action: {recommendation['action']} Owner: {recommendation['owner']}."
+
+    if any(term in question for term in ("compare", "comparison", "last year", "quarter", "rolling")):
+        return (f"For {kpi['period']}, actual {kpi['actual']:,.2f} is compared with "
+                f"same-month-last-year {comparisons.get('same_month_last_year', 'not available')}, "
+                f"prior-quarter average {comparisons.get('prior_quarter_average', 'not available')}, "
+                f"and rolling-year average {comparisons.get('rolling_year_average', 'not available')}.")
+
+    if any(term in question for term in ("role", "access", "scope", "branch")):
+        return (f"You are {context['user']} ({context['role']}) with {context['branch_scope']} scope. "
+                "Relationship managers see their own customers, branch heads see all customers in their branch, "
+                "and admins can see all branches."
+                )
+
+    if any(term in question for term in ("what changed", "movement", "actual", "baseline", "kpi")):
+        return (f"{kpi['label']} was {kpi['actual']:,.2f} in {kpi['period']} versus a baseline of "
+                f"{kpi['baseline']:,.2f}, a {kpi['change_pct']:+.1%} movement. "
+                f"Materiality is {detection['materiality_band']} and confidence is {context['confidence']['band']}.")
+
+    return ("I can answer questions about what changed, drivers, evidence, recommended action, "
+            "period comparisons, or your role and data scope. Ask one of those questions about the selected KPI.")
+
+
 def offline_template_narrative(pkg: InsightPackage) -> str:
     """Non-LLM fallback narrative, built purely from validated fields —
     useful for tests and for the offline demo path."""

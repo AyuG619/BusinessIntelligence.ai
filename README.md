@@ -48,7 +48,7 @@ Restart Streamlit after changing `.env`; configuration is loaded when `llm/clien
 
 ### Command center
 
-The entry page, [ui/app.py](ui/app.py), provides sidebar navigation, demo user selection, date/branch/product/segment filters, cached SQLite loading, live metrics, Plotly trend and product-mix views, a transaction table, CSV download, and deterministic scope summaries. For conversational analysis, use the dedicated Ask your data page described below.
+The entry page, [ui/app.py](ui/app.py), provides sidebar navigation, demo user selection, date/branch/product/segment filters, cached SQLite loading, live metrics, Plotly trend and product-mix views, a transaction table, CSV download, and deterministic scope summaries. Conversational analysis is intentionally kept on the dedicated Ask your data page described below.
 
 ### KPI Overview
 
@@ -80,13 +80,24 @@ Groq answers the user's actual question using the validated context.
 
 The assistant can discuss the current KPI, baseline, movement, drivers,
 evidence, freshness, confidence, recommendations, financial-year comparisons,
-branch scope, and role restrictions. If the context cannot answer a question,
-it identifies the missing information and asks one focused follow-up instead
-of inventing a generic answer.
+branch scope, and role restrictions. Admin users receive explicit KPI values
+for both BR-01 and BR-02 and can compare branch performance. Branch Heads
+receive explicit KPI values for each RM in their own branch and can compare RM
+performance. Relationship Managers see only their authorized portfolio.
+
+When Groq is unavailable, the page uses a deterministic fallback that answers
+only supported questions from the validated context. Unsupported questions
+receive a clear scope message instead of a fabricated answer.
 
 ### Security & access
 
 [Security Demo](ui/pages/4_Security_Demo.py) demonstrates RM, Branch Head, and Admin access rules. Allowed and denied customer, branch, and sensitive-field checks are written to the SQLite audit log.
+
+Role scope is explicit throughout the app: Admin has global branch and
+customer access; a Branch Head has all customer and RM performance data in
+their own branch; each Relationship Manager has only their own customers and
+portfolio metrics. Branch-level comparisons are Admin-only, while RM-level
+comparisons are available to Admins and Branch Heads.
 
 ## KPI contract
 
@@ -116,7 +127,7 @@ conversion totals with SQLite's lead-grain records and reports `RECONCILED` or
 
 [config/personas.yaml](config/personas.yaml) defines Relationship Manager, Branch Head, and Executive personas with different tone and detail levels. [llm/narrative.py](llm/narrative.py) puts the selected persona into the Groq prompt.
 
-Recommendation eligibility remains deterministic and is based on the driver and confidence band. Actions are not yet independently customized by persona; this is an intentional prototype limitation.
+Recommendation eligibility remains deterministic and is based on the driver and confidence band. Action text is also customized by persona: relationship managers receive tactical instructions, branch heads receive operational direction, and executives receive concise strategic framing.
 
 Feedback closes a bounded learning loop: after three ratings for a KPI, the
 useful/not-useful balance can adjust confidence by at most +/-0.10. Evidence
@@ -185,7 +196,7 @@ Run:
 pytest -q
 ```
 
-The suite covers KPI detection, product attribution, volume/mix/pricing decomposition, contradictory evidence, sparse history, confidence-gated recommendations, RBAC, source reconciliation, and feedback adjustment.
+The suite covers KPI detection, product attribution, volume/mix/pricing decomposition, contradictory evidence, sparse history, confidence-gated recommendations, RBAC, source reconciliation, feedback adjustment, deterministic chat fallback, and role-aware branch/RM comparisons.
 
 The synthetic generator creates 36 complete monthly periods. This supports
 same-month-last-year, prior-quarter-average, and prior-rolling-year comparisons
@@ -208,13 +219,14 @@ Implemented:
 - Three narrative personas.
 - Multi-factor movement, low-confidence abstention, sparse history, and RBAC scenarios.
 - Evidence freshness status, contribution, confidence, method, and lineage display.
+- Deterministic conversational answers with authorized branch and RM comparisons.
 - Groq/non-Groq processing boundary.
 - Latency, model-call, token, and estimated-cost telemetry.
 
 Still prototype-level:
 
 - Refresh cadence is metadata only; there are no independent source pipelines.
-- Persona-specific actions are not yet distinct.
+- Conversational question understanding remains intentionally bounded to supported deterministic queries when offline.
 - SQLite keyword retrieval is not semantic/vector retrieval.
 - Token counts and costs are estimates, not provider billing records.
 - Demo users and database data are synthetic; production authentication and deployment controls are not included.
