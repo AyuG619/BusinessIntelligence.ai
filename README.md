@@ -105,7 +105,7 @@ The calculation implementation is in [analytics/kpi_calculator.py](analytics/kpi
 
 [config/source_registry.yaml](config/source_registry.yaml) records source labels, grain, intended refresh cadence, trust weight, and warning age. Evidence documents carry `created_on`; [evidence/corroborate.py](evidence/corroborate.py) calculates `FRESH`, `STALE`, or `UNKNOWN` using the source warning window. Evidence cards display the status and creation date.
 
-The prototype simulates cadence metadata; it does not run separate ingestion jobs. All synthetic data is stored in one local SQLite file. A production version would connect the registry to ingestion timestamps and freshness checks.
+The prototype simulates cadence metadata; it does not run separate ingestion jobs. Operational synthetic data is stored in SQLite, while the marketing export is maintained as a separate CSV source. A production version would connect the registry to ingestion timestamps and freshness checks.
 
 The prototype also includes a separate `data/marketing_campaigns.csv` export
 at campaign/month/branch grain. `analytics/reconciliation.py` compares its
@@ -122,6 +122,26 @@ Feedback closes a bounded learning loop: after three ratings for a KPI, the
 useful/not-useful balance can adjust confidence by at most +/-0.10. Evidence
 requirements and contradiction rules still take precedence, and any applied
 adjustment is recorded in the confidence rationale.
+
+## Recent framework improvements
+
+- **Evidence-required confidence:** a movement with no retrievable evidence is
+	forced to `ABSTAIN`, regardless of materiality, so unsupported drivers cannot
+	trigger a normal recommendation.
+- **Customer-level evidence security:** relationship managers can retrieve
+	customer-scoped documents only for their own customers; branch heads are
+	restricted to customers in their branch; admins retain global scope.
+- **Strict stance validation:** LLM evidence classification accepts only a
+	complete `SUPPORTS`, `CONTRADICTS`, or `NEUTRAL` response, with deterministic
+	keyword fallback for malformed or offline responses.
+- **Traceable recommendations:** engagement actions no longer claim a numeric
+	customer count unless that metric is actually calculated by the engine.
+- **Cross-source reconciliation:** the marketing CSV and CRM lead table use
+	different grains and are compared explicitly, with mismatches marked
+	`REVIEW` rather than silently merged.
+- **Bounded feedback learning:** analyst and user ratings influence confidence
+	only after a minimum sample and cannot override evidence or contradiction
+	rules.
 
 ## Demo scenarios and expected output
 
