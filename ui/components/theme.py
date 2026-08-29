@@ -98,6 +98,22 @@ def section_label(text: str):
     st.markdown(f'<div class="section-label">{text}</div>', unsafe_allow_html=True)
 
 
+def format_display_date(value: str | None) -> str:
+    """Render YYYY-MM or ISO dates as compact month-year labels like Jul 2026."""
+    if not value:
+        return ""
+
+    text = str(value).strip()
+    try:
+        if len(text) == 7 and text[4] == "-":
+            parsed = dt.datetime.strptime(text, "%Y-%m")
+        else:
+            parsed = dt.datetime.fromisoformat(text)
+        return parsed.strftime("%b %Y")
+    except ValueError:
+        return text
+
+
 def financial_year_label(period: str) -> str:
     """Return an Indian-style financial year label for a YYYY-MM period."""
     year, month = (int(part) for part in period.split("-"))

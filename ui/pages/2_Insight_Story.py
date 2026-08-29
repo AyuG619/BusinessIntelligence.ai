@@ -24,7 +24,7 @@ from feedback.feedback import record_feedback, feedback_summary  # noqa: E402
 from ui.components.evidence_panel import render_evidence_panel  # noqa: E402
 from ui.components.confidence_badge import render_confidence_badge  # noqa: E402
 from ui.components.action_card import render_action_card  # noqa: E402
-from ui.components.theme import inject_theme, page_header, section_label, financial_year_label  # noqa: E402
+from ui.components.theme import inject_theme, page_header, section_label, format_display_date  # noqa: E402
 
 DB_PATH = ROOT / "db" / "banking.db"
 
@@ -67,7 +67,7 @@ except Exception as e:
     st.stop()
 
 section_label("01 / What changed")
-st.subheader(f"{kpi.label} · {financial_year_label(kpi.month)} · {kpi.month}")
+st.subheader(f"{kpi.label} · {format_display_date(kpi.month)}")
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Actual", f"{kpi.actual:,.2f}")
 c2.metric("Expected", f"{kpi.expected:,.2f}")

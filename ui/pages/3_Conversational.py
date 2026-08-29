@@ -20,7 +20,7 @@ from core.security import DEMO_USERS  # noqa: E402
 from evidence.corroborate import build_confidence  # noqa: E402
 from llm.narrative import generate_chat_response, offline_chat_response  # noqa: E402
 from recommend.engine import recommend  # noqa: E402
-from ui.components.theme import financial_year_label, inject_theme, page_header, section_label  # noqa: E402
+from ui.components.theme import format_display_date, inject_theme, page_header, section_label  # noqa: E402
 
 st.set_page_config(page_title="Ask your data", page_icon="💬", layout="wide")
 inject_theme()
@@ -81,7 +81,7 @@ except Exception as exc:
     st.stop()
 
 with st.container(border=True):
-    st.markdown(f"**{kpi.label} · {financial_year_label(kpi.month)} · {kpi.month}**")
+    st.markdown(f"**{kpi.label} · {format_display_date(kpi.month)}**")
     metric_cols = st.columns(4)
     metric_cols[0].metric("Actual", f"{kpi.actual:,.2f}")
     metric_cols[1].metric("Baseline", f"{kpi.expected:,.2f}")
@@ -97,8 +97,8 @@ context = {
     "kpi": {
         "key": kpi.kpi_key,
         "label": kpi.label,
-        "period": kpi.month,
-        "financial_year": financial_year_label(kpi.month),
+        "period": format_display_date(kpi.month),
+        "financial_year": "",
         "actual": kpi.actual,
         "baseline": kpi.expected,
         "change_pct": kpi.change_pct,
